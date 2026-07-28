@@ -31,7 +31,7 @@ the strategist spectates the session.
 
 ## Architecture
 
-```
+``` markdown
 iRacing (spectator mode)
         |
         v
@@ -57,6 +57,7 @@ races normally with no extra software.
 ## Scope
 
 ### v1
+
 - Live position, gap, session time remaining
 - Stint elapsed timer
 - Fuel: pre-race laps-per-tank estimate, live remaining-laps estimate, manual
@@ -65,6 +66,7 @@ races normally with no extra software.
 - Shared incident/notes log
 
 ### v2 (later)
+
 - Automated driver-swap countdown against the team's stint length rules
 - Per-stint history and a post-race review page
 - Authentication so the dashboard isn't a public URL
