@@ -29,6 +29,7 @@ CREATE TABLE murder_drivers (
     nickname TEXT,
     iracing_id TEXT,
     active BOOLEAN DEFAULT true,
+    city TEXT,
     timezone TEXT
 );
 

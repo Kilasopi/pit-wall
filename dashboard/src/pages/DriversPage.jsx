@@ -122,7 +122,7 @@ function RosterDriversCard() {
                   hour: '2-digit',
                   minute: '2-digit',
                 }).format(new Date());
-                return `${time} (${r.timezone})`;
+                return `${time} (${r.city ?? r.timezone})`;
               } catch {
                 return r.timezone;
               }
