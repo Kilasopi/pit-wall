@@ -12,7 +12,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.get('/api/murder-drivers', async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT id, name, nickname, iracing_id, active, city, timezone FROM murder_drivers ORDER BY name'
+        'SELECT id, name, nickname, iracing_id, active, city, country, timezone FROM murder_drivers ORDER BY name'
     );
     res.json(rows);
 });
@@ -20,14 +20,24 @@ app.get('/api/murder-drivers', async (req, res) => {
 app.get('/api/entry-drivers', async (req, res) => {
     const { rows } = await pool.query(`
         SELECT ed.id,
+               ed.driver_id,
+               ed.guest_name,
                COALESCE(md.name, ed.guest_name) AS driver_name,
                ed.driver_id IS NULL AS is_guest,
+               md.timezone,
                ed.event_name,
                ed.entry_name,
-               ed.car_number
+               ed.car_number,
+               ed.car_type,
+               ed.race_start_at,
+               ed.race_length_minutes,
+               ed.race_stint_count,
+               ed.race_stint_minutes,
+               ed.stint_order,
+               ed.stint_minutes
         FROM entry_drivers ed
         LEFT JOIN murder_drivers md ON md.id = ed.driver_id
-        ORDER BY ed.event_name, ed.entry_name, driver_name
+        ORDER BY ed.event_name, ed.entry_name, ed.stint_order NULLS LAST, driver_name
     `);
     res.json(rows);
 });
@@ -57,13 +67,13 @@ function broadcastToDashboards(state) {
 // =======
 
 app.post('/api/entry-drivers', async (req,res) => {
-    const { driverId, guestName, eventName, entryName, carNumber } = req.body;
+    const { driverId, guestName, eventName, entryName, carNumber, carType, stintMinutes } = req.body;
 
     const { rows } = await pool.query(
-        `INSERT INTO entry_drivers (driver_id, guest_name, event_name, entry_name, car_number)
-        VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO entry_drivers (driver_id, guest_name, event_name, entry_name, car_number, car_type, stint_minutes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
-        [driverId ?? null, guestName ?? null, eventName, entryName, carNumber ?? null]
+        [driverId ?? null, guestName ?? null, eventName, entryName, carNumber ?? null, carType ?? null, stintMinutes ?? null]
     )
     res.status(201).json(rows[0]);
 });
@@ -73,14 +83,101 @@ app.delete('/api/entry-drivers', async (req, res) => {
     res.status(204).end();
 });
 
-app.post('/api/murder-drivers', async (req, res) => {
-    const { name, nickname, iracingId, city, timezone } = req.body;
+// Adds another stint slot for the same driver (used for double/triple
+// stinting), appended to the end of that entry's schedule.
+app.post('/api/entry-drivers/:id/duplicate', async (req, res) => {
+    const { rows: sourceRows } = await pool.query('SELECT * FROM entry_drivers WHERE id = $1', [
+        req.params.id,
+    ]);
+    const source = sourceRows[0];
+    if (!source) return res.status(404).json({ error: 'Entry driver not found' });
+
+    const { rows: maxRows } = await pool.query(
+        `SELECT COALESCE(MAX(stint_order), -1) AS max_order
+         FROM entry_drivers WHERE event_name = $1 AND entry_name = $2`,
+        [source.event_name, source.entry_name]
+    );
+    const nextOrder = maxRows[0].max_order + 1;
 
     const { rows } = await pool.query(
-        `INSERT INTO murder_drivers (name, nickname, iracing_id, city, timezone)
-        VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO entry_drivers
+            (driver_id, guest_name, event_name, entry_name, car_number, car_type,
+             race_start_at, race_length_minutes, race_stint_count, race_stint_minutes,
+             stint_order, stint_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING *`,
+        [
+            source.driver_id,
+            source.guest_name,
+            source.event_name,
+            source.entry_name,
+            source.car_number,
+            source.car_type,
+            source.race_start_at,
+            source.race_length_minutes,
+            source.race_stint_count,
+            source.race_stint_minutes,
+            nextOrder,
+            source.stint_minutes,
+        ]
+    );
+    res.status(201).json(rows[0]);
+});
+
+app.delete('/api/entry-drivers/:id', async (req, res) => {
+    await pool.query('DELETE FROM entry_drivers WHERE id = $1', [req.params.id]);
+    res.status(204).end();
+});
+
+app.patch('/api/entry-drivers/:id', async (req, res) => {
+    const {
+        raceStartAt,
+        raceLengthMinutes,
+        raceStintCount,
+        raceStintMinutes,
+        stintOrder,
+        stintMinutes,
+        carType,
+        carNumber,
+    } = req.body;
+
+    const { rows } = await pool.query(
+        `UPDATE entry_drivers
+         SET race_start_at = COALESCE($1, race_start_at),
+             race_length_minutes = COALESCE($2, race_length_minutes),
+             race_stint_count = COALESCE($3, race_stint_count),
+             race_stint_minutes = COALESCE($4, race_stint_minutes),
+             stint_order = COALESCE($5, stint_order),
+             stint_minutes = COALESCE($6, stint_minutes),
+             car_type = COALESCE($7, car_type),
+             car_number = COALESCE($8, car_number)
+         WHERE id = $9
+         RETURNING *`,
+        [
+            raceStartAt ?? null,
+            raceLengthMinutes ?? null,
+            raceStintCount ?? null,
+            raceStintMinutes ?? null,
+            stintOrder ?? null,
+            stintMinutes ?? null,
+            carType ?? null,
+            carNumber ?? null,
+            req.params.id,
+        ]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ error: 'Entry driver not found' });
+    res.json(rows[0]);
+});
+
+app.post('/api/murder-drivers', async (req, res) => {
+    const { name, nickname, iracingId, city, country, timezone } = req.body;
+
+    const { rows } = await pool.query(
+        `INSERT INTO murder_drivers (name, nickname, iracing_id, city, country, timezone)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *`,
-        [name, nickname ?? null, iracingId ?? null, city ?? null, timezone ?? null]
+        [name, nickname ?? null, iracingId ?? null, city ?? null, country ?? null, timezone ?? null]
     )
     res.status(201).json(rows[0]);
 });
@@ -92,6 +189,7 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
             nickname,
             iracingId,
             city,
+            country,
             timezone,
             active,
         } = req.body;
@@ -102,15 +200,17 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
                  nickname = $2,
                  iracing_id = $3,
                  city = $4,
-                 timezone = $5,
-                 active = $6
-             WHERE id = $7
+                 country = $5,
+                 timezone = $6,
+                 active = $7
+             WHERE id = $8
              RETURNING *`,
             [
                 name,
                 nickname ?? null,
                 iracingId ?? null,
                 city ?? null,
+                country ?? null,
                 timezone ?? null,
                 active,
                 req.params.id,
@@ -192,49 +292,4 @@ app.get('/api/special-events', async (req, res) => {
     }
 
     res.json(specialEventsCache.events);
-});
-
-// =========
-// Timezones
-// =========
-
-app.get('/api/timezone', async (req, res) => {
-    const city = String(req.query.city ?? '').trim();
-
-    if (city.length < 2) {
-        return res.status(400).json({ error: 'Enter a city name' });
-    }
-
-    try {
-        const params = new URLSearchParams({
-            name: city,
-            count: '1',
-            language: 'en',
-            format: 'json',
-        });
-
-        const response = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?${params}`
-        );
-
-        if (!response.ok) {
-            return res.status(502).json({ error: 'Location lookup failed' });
-        }
-
-        const data = await response.json();
-        const match = data.results?.[0];
-
-        if (!match?.timezone) {
-            return res.status(404).json({ error: 'City not found' });
-        }
-
-        res.json({
-            city: match.name,
-            region: match.admin1 ?? null,
-            country: match.country ?? null,
-            timezone: match.timezone,
-        });
-    } catch {
-        res.status(502).json({ error: 'Location lookup failed' });
-    }
 });

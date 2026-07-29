@@ -30,6 +30,7 @@ CREATE TABLE murder_drivers (
     iracing_id TEXT,
     active BOOLEAN DEFAULT true,
     city TEXT,
+    country TEXT,
     timezone TEXT
 );
 
@@ -43,5 +44,17 @@ CREATE TABLE entry_drivers (
     event_name TEXT NOT NULL,
     entry_name TEXT NOT NULL,
     car_number TEXT,
+    car_type TEXT CHECK (car_type IS NULL OR car_type IN ('GTP', 'LMP2', 'GT3', 'GT4')),
+    -- Stint planning: race_start_at and race_length_minutes are shared across
+    -- every row for the same (event_name, entry_name); stint_order determines
+    -- driving order and stint_minutes is that driver's planned stint length.
+    race_start_at TIMESTAMPTZ,
+    race_length_minutes INT,
+    -- Alternate way to define the full schedule: a fixed number of stints of
+    -- a uniform length, instead of deriving stint count from race length.
+    race_stint_count INT,
+    race_stint_minutes INT,
+    stint_order INT,
+    stint_minutes INT,
     CHECK (num_nonnulls(driver_id, guest_name) = 1)
 );

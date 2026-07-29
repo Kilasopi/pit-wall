@@ -43,7 +43,9 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
     city.trim().length > 0 &&
     country.trim().length === 2;
 
-  function detectTimezone(cityName, countryCode) {
+  function detectTimezone(cityName, countryCode = country) {
+    if (!countryCode.trim()) return '';
+
     const matches = cityTimezones.lookupViaCity(cityName.trim());
 
     const match = matches.find(
@@ -71,26 +73,27 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
     setSubmitting(true);
     setError(null);
 
-    const resolvedTimezone = timezone || detectTimezone(city);
-
-    if (!resolvedTimezone) {
-      setSubmitting(false);
-      return;
-    }
-
-    const body = {
-      name: name.trim(),
-      nickname: nickname.trim() || null,
-      iracingId: iracingId.trim() || null,
-      city: city.trim(),
-      timezone: resolvedTimezone,
-    };
-
-    if (isEditing) {
-      body.active = active;
-    }
-
     try {
+      const resolvedTimezone = timezone || detectTimezone(city);
+
+      if (!resolvedTimezone) {
+        setSubmitting(false);
+        return;
+      }
+
+      const body = {
+        name: name.trim(),
+        nickname: nickname.trim() || null,
+        iracingId: iracingId.trim() || null,
+        city: city.trim(),
+        country: country.trim() || null,
+        timezone: resolvedTimezone,
+      };
+
+      if (isEditing) {
+        body.active = active;
+      }
+
       const endpoint = isEditing
         ? `${RELAY_HTTP_URL}/api/murder-drivers/${driver.id}`
         : `${RELAY_HTTP_URL}/api/murder-drivers`;

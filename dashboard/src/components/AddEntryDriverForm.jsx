@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { CAR_TYPES } from '@/lib/carTypes';
 
 const CUSTOM_EVENT = '__custom__';
 
@@ -26,7 +28,7 @@ export function AddEntryDriverForm({ onAdded }) {
   const [eventChoice, setEventChoice] = useState('');
   const [customEventName, setCustomEventName] = useState('');
   const [entryName, setEntryName] = useState('');
-  const [carNumber, setCarNumber] = useState('');
+  const [carType, setCarType] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -62,7 +64,7 @@ export function AddEntryDriverForm({ onAdded }) {
     const shared = {
       eventName,
       entryName: entryName.trim(),
-      carNumber: carNumber.trim() || null,
+      carType: carType || null,
     };
 
     try {
@@ -181,13 +183,25 @@ export function AddEntryDriverForm({ onAdded }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="carNumber">Car #</Label>
-            <Input
-              id="carNumber"
-              value={carNumber}
-              onChange={(e) => setCarNumber(e.target.value)}
-              placeholder="e.g. 27"
-            />
+            <Label>Car Type</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {CAR_TYPES.map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setCarType(type.value)}
+                  className={cn(
+                    'flex flex-col items-center gap-1 rounded-lg border p-2 transition-colors',
+                    carType === type.value
+                      ? 'border-primary bg-primary/10'
+                      : 'border-input hover:bg-muted'
+                  )}
+                >
+                  <img src={type.img} alt={type.label} className="h-auto w-full" />
+                  <span className="text-sm font-medium">{type.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

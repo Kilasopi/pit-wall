@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 const links = [
   { to: '/', label: 'Live' },
   { to: '/drivers', label: 'Drivers' },
+  { to: '/planner', label: 'Stint Planner' },
 ];
 
 export function NavBar() {

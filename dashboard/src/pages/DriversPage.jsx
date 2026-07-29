@@ -23,8 +23,23 @@ import {
   TableCell,
 } from '@/components/ui/table';
 
-function DriversTable({ endpoint, title, description, columns, onClear, headerAction }) {
-  const { data, loading, error } = useDrivers(endpoint);
+function dedupeEntries(rows) {
+  const seen = new Set();
+  const result = [];
+  for (const row of rows) {
+    const driverKey = row.is_guest ? `guest:${row.guest_name}` : `roster:${row.driver_id}`;
+    const key = `${row.event_name}|||${row.entry_name}|||${driverKey}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(row);
+    }
+  }
+  return result;
+}
+
+function DriversTable({ endpoint, title, description, columns, onClear, headerAction, transform }) {
+  const { data: rawData, loading, error } = useDrivers(endpoint);
+  const data = transform ? transform(rawData) : rawData;
 
   return (
     <Card>
@@ -174,6 +189,7 @@ function EntryDriversCard() {
         endpoint="entry-drivers"
         title="Entry Drivers"
         description="Cleared when the event finishes"
+        transform={dedupeEntries}
         onClear={() => {
           if (!confirm('Clear all entry drivers?')) return;
           fetch(`${RELAY_HTTP_URL}/api/entry-drivers`, { method: 'DELETE' });
@@ -187,7 +203,7 @@ function EntryDriversCard() {
           { key: 'driver_name', label: 'Name' },
           { key: 'event_name', label: 'Event' },
           { key: 'entry_name', label: 'Entry' },
-          { key: 'car_number', label: 'Car #', render: (r) => r.car_number ?? '—' },
+          { key: 'car_type', label: 'Car Type', render: (r) => r.car_type ?? '—' },
           {
             key: 'is_guest',
             label: 'Type',
@@ -207,7 +223,11 @@ function EntryDriversCard() {
 
 function DriversPage() {
   return (
+    
     <div className="min-h-screen bg-background p-6 text-foreground">
+      <div className="mb-2 flex items-center justify-between">
+        <h1 className="text-xl font-heading font-medium">Team M.U.R.D.E.R</h1>
+      </div>
       <NavBar />
 
       <div className="grid items-start gap-4 md:grid-cols-2">
