@@ -4,6 +4,7 @@ const { DashboardServer } = require('./dashboard_server');
 const { FuelCalculator } = require('./fuel_calculator');
 const { StrategyEngine } = require('./strategy_engine');
 const { createStorage } = require('./storage');
+const telemetryDump = require('./telemetry_dump'); // THROWAWAY, see telemetry_dump.js
 
 const server = new AgentWebSocketServer(config);
 const dashboard = new DashboardServer(config);
@@ -52,9 +53,14 @@ async function handleIncident({ points, lap }) {
 server.on('collector-connected', () => console.log('Collector connected'));
 server.on('collector-disconnected', () => console.log('Collector disconnected'));
 
-server.on('session', (data) => strategyEngine.ingestSession(data));
+server.on('session', (data) => {
+    telemetryDump.dump('session', data); // THROWAWAY
+    strategyEngine.ingestSession(data);
+});
 
 server.on('telemetry', (values) => {
+    telemetryDump.dump('telemetry', values); // THROWAWAY
+
     // Raw feed, broadcast as-is alongside the derived stint/fuel/incident
     // messages — a hook for building new functionality against the full
     // telemetry stream without touching strategy_engine/fuel_calculator.

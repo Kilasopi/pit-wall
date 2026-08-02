@@ -60,10 +60,14 @@ services:
       AGENT_PORT: 4100
       DASHBOARD_PORT: 4101
       DATABASE_URL: postgres://postgres:password@postgres:5432/pitwall
+    volumes:
+      # Throwaway telemetry dump for exploring payload shapes — see
+      # agent/telemetry_dump.js. Remove this along with that file once done.
+      - ./agent/tmp-telemetry-dump:/app/agent/tmp-telemetry-dump
     depends_on:
       postgres:
         condition: service_healthy
-    
+
     develop:
       watch:
         - action: sync+restart
@@ -83,10 +87,17 @@ services:
     environment:
       RELAY_PROXY_TARGET: http://relay:4000
       AGENT_PROXY_TARGET: ws://agent:4101
+    volumes:
+      # Persist Vite's dep pre-bundle cache across container recreations.
+      # Without this, every `docker compose up` re-scans/re-bundles deps
+      # from scratch, which can race with the first render and produce
+      # "Invalid hook call" from a mid-load dependency re-optimize
+      # (same class of issue as the optimizeDeps.include below).
+      - dashboard_vite_cache:/app/node_modules/.vite
     depends_on:
       - relay
       - agent
-    
+
     develop:
       watch:
         - action: sync
@@ -105,5 +116,22 @@ services:
         - action: rebuild
           path: ./dashboard/package-lock.json
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --config /etc/cloudflared/config.yml run
+    # Credentials/cert files on the host are owner-only (0600/0700, uid
+    # 1000); the image's default nonroot user can't read them otherwise.
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      # Named tunnel credentials/config live on the host at ~/.cloudflared —
+      # config.yml points its ingress at http://dashboard:5173, the
+      # in-network service name (not localhost, which inside this
+      # container means the cloudflared container itself).
+      - ${HOME}/.cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - dashboard
+    restart: unless-stopped
+
 volumes:
   pitwall_pgdata:
+  dashboard_vite_cache:

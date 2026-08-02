@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import PitWall from './pages/PitWall.jsx'
 import DriversPage from './pages/DriversPage.jsx'
 import StintPlannerPage from './pages/StintPlannerPage.jsx'
+import ThemePreview from './pages/ThemePreview.jsx'
 
 function App() {
   return (
@@ -10,6 +11,9 @@ function App() {
         <Route path="/" element={<PitWall />} />
         <Route path="/drivers" element={<DriversPage />} />
         <Route path="/planner" element={<StintPlannerPage />} />
+        {import.meta.env.DEV && (
+          <Route path="/theme-preview" element={<ThemePreview />} />
+        )}
       </Routes>
     </BrowserRouter>
   )
