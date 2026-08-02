@@ -4,6 +4,21 @@
 const { EventEmitter } = require('events');
 const { IRacingSDK } = require('irsdk-node');
 
+// irsdk-node returns each variable as { name, value: [...], unit, ... }
+// rather than a plain value — unwrap once here so everything downstream
+// (telemetry_sender, and ultimately the agent) just sees plain values.
+function flattenTelemetry(raw) {
+    const flat = {};
+    for (const [key, meta] of Object.entries(raw ?? {})) {
+        if (meta && Array.isArray(meta.value)) {
+            flat[key] = meta.value.length === 1 ? meta.value[0] : meta.value;
+        } else {
+            flat[key] = meta;
+        }
+    }
+    return flat;
+}
+
 class IracingReader extends EventEmitter {
     constructor({ telemetryPollRateMs, sessionPollRateMs } = {}) {
         super();
@@ -43,7 +58,7 @@ class IracingReader extends EventEmitter {
         if (sessionOk && this._sdk.waitForData(this._telemetryPollRateMs)) {
             if (this._sdk.currDataVersion !== this._lastDataVersion) {
                 this._lastDataVersion = this._sdk.currDataVersion;
-                this.emit('telemetry', this._sdk.getTelemetry());
+                this.emit('telemetry', flattenTelemetry(this._sdk.getTelemetry()));
             }
 
             const now = Date.now();
