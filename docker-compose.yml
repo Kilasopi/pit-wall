@@ -50,6 +50,9 @@ services:
     build: ./dashboard
     ports:
       - "5173:5173"
+    environment:
+      RELAY_PROXY_TARGET: http://relay:4000
+      AGENT_PROXY_TARGET: ws://agent:4101
     depends_on:
       - relay
       - agent
