@@ -17,13 +17,6 @@ import {
   TableCell,
 } from '@/components/ui/table';
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-
 function fuelVariant(lapsRemaining) {
   if (lapsRemaining == null) return 'outline';
   if (lapsRemaining <= 3) return 'destructive';
@@ -44,105 +37,97 @@ function PitWall() {
       </div>
 
       <NavBar />
-      <Tabs defaultValue="pitwall" className="mb-4">
-        <TabsList>
-          <TabsTrigger value="pitwall">Pit Wall</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-        <TabsContent value="pitwall">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Stint</CardTitle>
-                <CardDescription>
-                  {stint ? `Car #${stint.carNumber ?? '—'}` : 'No stint data yet'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {stint ? (
-                  <dl className="grid grid-cols-2 gap-y-1 text-sm">
-                    <dt className="text-muted-foreground">Driver</dt>
-                    <dd>{stint.driver}</dd>
-                    <dt className="text-muted-foreground">Car</dt>
-                    <dd>{stint.carName ?? '—'}</dd>
-                    <dt className="text-muted-foreground">Laps completed</dt>
-                    <dd>{stint.lapsCompleted ?? '—'}</dd>
-                  </dl>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Waiting for stint telemetry…
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Stint</CardTitle>
+              <CardDescription>
+                {stint ? `Car #${stint.carNumber ?? '—'}` : 'No stint data yet'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stint ? (
+                <dl className="grid grid-cols-2 gap-y-1 text-sm">
+                  <dt className="text-muted-foreground">Driver</dt>
+                  <dd>{stint.driver}</dd>
+                  <dt className="text-muted-foreground">Car</dt>
+                  <dd>{stint.carName ?? '—'}</dd>
+                  <dt className="text-muted-foreground">Laps completed</dt>
+                  <dd>{stint.lapsCompleted ?? '—'}</dd>
+                </dl>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Waiting for stint telemetry…
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Fuel</CardTitle>
-                <CardDescription>
-                  {fuel?.source ? `Source: ${fuel.source}` : 'No fuel data yet'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {fuel ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-medium">
-                      {fuel.lapsRemainingEst}
-                    </span>
-                    <span className="text-sm text-muted-foreground">laps remaining (est.)</span>
-                    <Badge variant={fuelVariant(fuel.lapsRemainingEst)}>
-                      {fuel.lapsRemainingEst <= 3 ? 'Pit soon' : 'OK'}
-                    </Badge>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Waiting for fuel telemetry…
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Fuel</CardTitle>
+              <CardDescription>
+                {fuel?.source ? `Source: ${fuel.source}` : 'No fuel data yet'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {fuel ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-medium">
+                    {fuel.lapsRemainingEst}
+                  </span>
+                  <span className="text-sm text-muted-foreground">laps remaining (est.)</span>
+                  <Badge variant={fuelVariant(fuel.lapsRemainingEst)}>
+                    {fuel.lapsRemainingEst <= 3 ? 'Pit soon' : 'OK'}
+                  </Badge>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Waiting for fuel telemetry…
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Incidents</CardTitle>
-                <CardDescription>{incidents.length} logged</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {incidents.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Lap</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Points</TableHead>
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Incidents</CardTitle>
+              <CardDescription>{incidents.length} logged</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {incidents.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Lap</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Points</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {incidents.map((incident, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{incident.lap ?? '—'}</TableCell>
+                        <TableCell>{incident.description}</TableCell>
+                        <TableCell>
+                          {incident.points != null ? (
+                            <Badge variant={incident.points >= 4 ? 'destructive' : 'secondary'}>
+                              {incident.points}x
+                            </Badge>
+                          ) : (
+                            '—'
+                          )}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {incidents.map((incident, i) => (
-                        <TableRow key={i}>
-                          <TableCell>{incident.lap ?? '—'}</TableCell>
-                          <TableCell>{incident.description}</TableCell>
-                          <TableCell>
-                            {incident.points != null ? (
-                              <Badge variant={incident.points >= 4 ? 'destructive' : 'secondary'}>
-                                {incident.points}x
-                              </Badge>
-                            ) : (
-                              '—'
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No incidents logged</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground">No incidents logged</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
     </div>
   );
 }
