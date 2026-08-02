@@ -8,7 +8,14 @@ const { Pool } = require('pg');
 const app = express();
 app.use(cors());
 app.use(express.json());
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Managed providers (Neon, etc.) put sslmode=require in the connection
+// string and need an explicit ssl option — the local Docker postgres
+// doesn't speak TLS at all, so this only turns on when the URL asks for it.
+const useSsl = /sslmode=require/.test(process.env.DATABASE_URL || '');
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+});
 
 app.get('/api/murder-drivers', async (req, res) => {
     const { rows } = await pool.query(

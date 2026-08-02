@@ -4,7 +4,14 @@
 const { Pool } = require('pg');
 
 function createStorage(databaseUrl) {
-    const pool = new Pool({ connectionString: databaseUrl });
+    // Managed providers (Neon, etc.) put sslmode=require in the connection
+    // string and need an explicit ssl option — the local Docker postgres
+    // doesn't speak TLS at all, so this only turns on when the URL asks for it.
+    const useSsl = /sslmode=require/.test(databaseUrl || '');
+    const pool = new Pool({
+        connectionString: databaseUrl,
+        ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+    });
 
     return {
         async findDriverNameByIracingId(iracingId) {

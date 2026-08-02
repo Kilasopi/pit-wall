@@ -1,36 +1,22 @@
-# Work PC stack only — postgres, relay, agent, dashboard. The collector
-# is intentionally not here: it has to run natively on the Sim PC's
-# Windows install to reach iRacing's shared memory directly, which
-# Docker doesn't help with and only adds friction to.
+# Work PC stack only — relay, agent, dashboard. Postgres is Neon (managed,
+# see relay/.env and agent/.env) so drivers/stints/incidents persist across
+# every device hitting the tunnel, not just this machine. The collector is
+# intentionally not here either: it has to run natively on the Sim PC's
+# Windows install to reach iRacing's shared memory directly, which Docker
+# doesn't help with and only adds friction to.
+#
+# DATABASE_URL below comes from a root-level .env (gitignored — see
+# .env.example) that Compose loads automatically for variable substitution;
+# it's the same Neon connection string as relay/.env and agent/.env.
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: pitwall
-    ports:
-      - "5432:5432"
-    volumes:
-      - pitwall_pgdata:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   relay:
     build: ./relay
     ports:
       - "4000:4000"
     environment:
-      DATABASE_URL: postgres://postgres:password@postgres:5432/pitwall
+      DATABASE_URL: ${DATABASE_URL}
       PORT: 4000
-    depends_on:
-      postgres:
-        condition: service_healthy
-    
+
     develop:
       watch:
         - action: sync+restart
@@ -59,14 +45,11 @@ services:
     environment:
       AGENT_PORT: 4100
       DASHBOARD_PORT: 4101
-      DATABASE_URL: postgres://postgres:password@postgres:5432/pitwall
+      DATABASE_URL: ${DATABASE_URL}
     volumes:
       # Throwaway telemetry dump for exploring payload shapes — see
       # agent/telemetry_dump.js. Remove this along with that file once done.
       - ./agent/tmp-telemetry-dump:/app/agent/tmp-telemetry-dump
-    depends_on:
-      postgres:
-        condition: service_healthy
 
     develop:
       watch:
@@ -133,5 +116,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  pitwall_pgdata:
   dashboard_vite_cache:
