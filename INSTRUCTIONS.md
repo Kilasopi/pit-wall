@@ -3,16 +3,45 @@
 Two devices, two services:
 
 - **Sim PC** (the machine running iRacing) → runs `collector/`
-- **Work PC** (the strategist's machine) → runs `agent/`, and (for now, still) `relay/` + `dashboard/`
+- **Work PC** (the strategist's machine) → runs `agent/` + `relay/` + `dashboard/`
+  (all three at once via Docker — see step 1)
 
 The collector reads live telemetry from iRacing's shared memory and streams it
 to the agent over a WebSocket. Both machines need to be on the **same
 network** (same Wi-Fi/LAN, or a race-day hotspot) — there's no internet-facing
 setup here, no auth, no TLS. Treat the connection as trusted-LAN-only.
 
-## 1. Work PC — start the agent first
+## 1. Work PC — start everything with Docker
 
-The agent has to be listening before the collector tries to connect.
+This is the normal path — it brings up the agent (for the collector to connect
+to), relay, the dashboard the team watches, and the Cloudflare tunnel that
+makes the dashboard reachable off this machine, all in one command.
+
+1. Install [Docker](https://docs.docker.com/get-docker/) if it isn't already.
+2. Make sure the repo-root `.env` exists with a working `DATABASE_URL` — see
+   **Database** below. Without it, `relay`/`agent` start but every DB query fails.
+3. From the repo root:
+   ```bash
+   docker compose up -d
+   ```
+4. Check it came up clean:
+   ```bash
+   docker compose logs relay agent dashboard cloudflared --tail=20
+   ```
+   You should see `Relay listening on 4000`, `Agent WebSocket server listening on
+   4100`, Vite's `ready in ...ms`, and `cloudflared`'s `Registered tunnel
+   connection` lines. The team can now load **https://pitwall.murder-pitwall.com**.
+5. Find this machine's LAN IP (you'll need it for the collector's config):
+   - Windows: `ipconfig` → look for "IPv4 Address" under your active adapter
+   - Mac/Linux: `ipconfig getifaddr en0` or `hostname -I`
+6. **Allow port 4100 through the Work PC's firewall** if prompted (Windows Defender Firewall will usually ask the first time — allow it on Private networks). If the collector can't connect later, this is the first thing to check.
+
+To stop everything: `docker compose down` from the repo root.
+
+### Running the agent by itself instead (no Docker)
+
+Only needed if you're deliberately not using Docker for the Work PC side —
+Docker's `docker compose up -d` above already covers this.
 
 1. Install [Node.js](https://nodejs.org) 18+ if it isn't already.
 2. From the repo root:
@@ -20,15 +49,9 @@ The agent has to be listening before the collector tries to connect.
    cd agent
    npm install
    ```
-3. Check `agent/.env` — it already has a working default:
-   ```
-   AGENT_PORT=4100
-   ```
-   Change the port only if `4100` is taken or you need it to match something else.
-4. Find this machine's LAN IP (you'll need it for the collector's config):
-   - Windows: `ipconfig` → look for "IPv4 Address" under your active adapter
-   - Mac/Linux: `ipconfig getifaddr en0` or `hostname -I`
-5. Start it:
+3. Check `agent/.env` has `AGENT_PORT=4100` and a working `DATABASE_URL` (see
+   **Database** below).
+4. Start it:
    ```bash
    npm start
    ```
@@ -36,7 +59,9 @@ The agent has to be listening before the collector tries to connect.
    ```
    Agent WebSocket server listening on 4100
    ```
-6. **Allow the port through the Work PC's firewall** if prompted (Windows Defender Firewall will usually ask the first time — allow it on Private networks). If the collector can't connect later, this is the first thing to check.
+   You'd then also need to start `relay` (`cd relay && npm install && npm start`)
+   and `dashboard` (`cd dashboard && npm install && npm run dev`) the same way,
+   plus the tunnel — see **Team access** below.
 
 ## 2. Sim PC — start the collector
 
@@ -50,7 +75,7 @@ The agent has to be listening before the collector tries to connect.
    This pulls in `irsdk-node`, which includes a native addon. It's Windows-only — this step needs to happen on the actual Sim PC, not in a Linux/Mac dev environment. If `npm install` fails trying to build the native module, install the [Windows Build Tools](https://github.com/nodejs/node-gyp#on-windows) (`npm install --global windows-build-tools` or the Visual Studio Build Tools with the "Desktop development with C++" workload) and retry.
 4. Edit `collector/.env` and point it at the Work PC:
    ```
-   AGENT_HOST=<Work PC's LAN IP from step 1.4>
+   AGENT_HOST=<Work PC's LAN IP from step 1.5>
    AGENT_PORT=4100
    ```
 5. Start it:
@@ -73,18 +98,6 @@ If the collector logs `WebSocket error` or keeps reconnecting without the agent 
 - Wrong `AGENT_HOST` (double-check the Work PC's IP — it can change on reconnect to Wi-Fi)
 - Work PC firewall blocking the port
 - Devices actually on different networks (e.g., one on a guest Wi-Fi network that isolates clients from each other)
-
-## 3. Work PC via Docker (alternative to steps 1/3 above)
-
-Instead of running `relay`/`agent`/`dashboard` individually, `docker compose up -d`
-from the repo root starts all three together, plus `cloudflared` for team access
-(see below). See `docker-compose.yml`. The collector still runs natively on the
-Sim PC either way — Docker only covers the Work PC side.
-
-There's no local Postgres container — `relay`/`agent` connect straight to the
-shared Neon database (see **Database** below). Make sure the repo-root `.env`
-exists before bringing the stack up, or `relay`/`agent` will start with an empty
-`DATABASE_URL` and every query will fail.
 
 ## Database
 
