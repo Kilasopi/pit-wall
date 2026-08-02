@@ -1,0 +1,25 @@
+{
+  "name": "collector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sim PC service: reads iRacing SDK shared memory and streams telemetry to the agent over WebSocket",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "irsdk-node": "^4.4.0",
+    "ws": "^8.21.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
