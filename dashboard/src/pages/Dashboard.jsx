@@ -50,6 +50,8 @@ function App() {
               <dl className="grid grid-cols-2 gap-y-1 text-sm">
                 <dt className="text-muted-foreground">Driver</dt>
                 <dd>{stint.driver}</dd>
+                <dt className="text-muted-foreground">Car</dt>
+                <dd>{stint.carName ?? '—'}</dd>
                 <dt className="text-muted-foreground">Laps completed</dt>
                 <dd>{stint.lapsCompleted ?? '—'}</dd>
               </dl>

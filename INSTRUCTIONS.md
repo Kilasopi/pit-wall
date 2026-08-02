@@ -74,24 +74,32 @@ If the collector logs `WebSocket error` or keeps reconnecting without the agent 
 - Work PC firewall blocking the port
 - Devices actually on different networks (e.g., one on a guest Wi-Fi network that isolates clients from each other)
 
-## 3. What's not wired up yet
+## 3. Work PC via Docker (alternative to steps 1/3 above)
 
-The agent currently just receives and logs telemetry/session data — it doesn't
-yet compute fuel/strategy numbers, store anything, or serve the dashboard.
-`relay/` + `dashboard/` still work exactly as before and are unaffected by
-any of this.
+Instead of running `relay`/`agent`/`dashboard` individually, `docker compose up -d`
+from the repo root starts Postgres + all three together, with `db/schema.sql`
+auto-applied on first run. See `docker-compose.yml`. The collector still runs
+natively on the Sim PC either way — Docker only covers the Work PC side.
 
 ## Team access
 
-Right now this is a single-user, strategist-only tool (see [README.md](README.md)) — your
-drivers don't need to install or run anything, and there's no dashboard URL for them to
-open. If you want teammates to see the live dashboard too, that's a separate feature to
-build, not something this setup gives you automatically. The two realistic options once
-it's worth doing:
+The dashboard is reachable by the whole team at **https://pitwall.murder-pitwall.com**,
+via a Cloudflare named tunnel running on the Work PC. No install needed on anyone's
+end — just open the link. There's currently no login gate on it (a deliberate choice —
+treat the URL itself as the only protection; don't post it somewhere public).
 
-- **Same-room LAN view** — point a browser at the Work PC's IP and the dashboard's dev
-  server port. Fine for a spotter/pit crew sitting in the same room on race day, but
-  gives everyone on the network read access to whatever the dashboard exposes.
-- **Remote access** — needs an actual deployment story (hosting, auth, HTTPS) rather than
-  pointing people at a laptop's dev server. Bigger scope, worth its own discussion before
-  building.
+**Restarting the tunnel** (needed after a Work PC reboot, since nothing currently
+auto-starts it): the tunnel's config and credentials live in `~/.cloudflared/` on
+*this* Work PC specifically (not in this repo — `~/.cloudflared/config.yml` +
+a credentials JSON file tied to the `murder-pitwall.com` Cloudflare account). From
+any directory:
+```bash
+cloudflared tunnel run pitwall
+```
+Leave it running in a terminal (or set it up as a background service — not yet
+done). The dashboard (`docker compose up -d` or `npm start`) needs to already be
+up on port 5173 for the tunnel to have anything to proxy to.
+
+If you ever set this up on a *different* machine, you'd need to redo `cloudflared
+tunnel login` there — the credentials are per-machine, not something to copy
+between computers.

@@ -14,7 +14,7 @@ const storage = config.databaseUrl ? createStorage(config.databaseUrl) : null;
 let currentStintId = null;
 let lastLapsCompleted = 0;
 
-async function handleSwap({ driver, carNumber }) {
+async function handleSwap({ driver, carNumber, carName }) {
     if (currentStintId !== null && storage) {
         await storage.closeStint(currentStintId, {
             endedAt: new Date(),
@@ -23,7 +23,7 @@ async function handleSwap({ driver, carNumber }) {
     }
 
     lastLapsCompleted = 0;
-    dashboard.broadcast('stint', { driver, carNumber, lapsCompleted: 0 });
+    dashboard.broadcast('stint', { driver, carNumber, carName, lapsCompleted: 0 });
 
     if (storage) {
         currentStintId = await storage.openStint({ driver, carNumber, startedAt: new Date() });
@@ -32,8 +32,8 @@ async function handleSwap({ driver, carNumber }) {
 
 async function handleLap({ lapsCompletedThisStint }) {
     lastLapsCompleted = lapsCompletedThisStint;
-    const { driver, carNumber } = strategyEngine.currentDriver();
-    dashboard.broadcast('stint', { driver, carNumber, lapsCompleted: lapsCompletedThisStint });
+    const { driver, carNumber, carName } = strategyEngine.currentDriver();
+    dashboard.broadcast('stint', { driver, carNumber, carName, lapsCompleted: lapsCompletedThisStint });
 
     if (storage && currentStintId !== null) {
         await storage.updateStintLaps(currentStintId, lapsCompletedThisStint);

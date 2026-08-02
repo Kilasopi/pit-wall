@@ -16,6 +16,7 @@ class StrategyEngine {
         this._lapAtStintStart = null;
         this._currentDriver = null;
         this._currentCarNumber = null;
+        this._currentCarName = null;
     }
 
     ingestSession(sessionInfo) {
@@ -23,7 +24,7 @@ class StrategyEngine {
     }
 
     // Returns an array of events for this telemetry tick, any of:
-    //   { type: 'swap', driver, carNumber, lap }
+    //   { type: 'swap', driver, carNumber, carName, lap }
     //   { type: 'lap', lapsCompletedThisStint }
     //   { type: 'incident', points, lap }
     ingestTelemetry(values) {
@@ -36,11 +37,12 @@ class StrategyEngine {
             this._lastDCDriversSoFar = values.DCDriversSoFar;
 
             if (isFirstTick || isSwap) {
-                const { driver, carNumber } = this._resolveCurrentDriver(values);
+                const { driver, carNumber, carName } = this._resolveCurrentDriver(values);
                 this._currentDriver = driver;
                 this._currentCarNumber = carNumber;
+                this._currentCarName = carName;
                 this._lapAtStintStart = lap ?? 0;
-                events.push({ type: 'swap', driver, carNumber, lap });
+                events.push({ type: 'swap', driver, carNumber, carName, lap });
             }
         }
 
@@ -64,7 +66,11 @@ class StrategyEngine {
     }
 
     currentDriver() {
-        return { driver: this._currentDriver, carNumber: this._currentCarNumber };
+        return {
+            driver: this._currentDriver,
+            carNumber: this._currentCarNumber,
+            carName: this._currentCarName,
+        };
     }
 
     _resolveCurrentDriver(values) {
@@ -79,6 +85,7 @@ class StrategyEngine {
             driver: info?.UserName ?? 'Unknown driver',
             carNumber:
                 info?.CarNumber ?? (info?.CarNumberRaw != null ? String(info.CarNumberRaw) : null),
+            carName: info?.CarScreenName ?? null,
         };
     }
 }
