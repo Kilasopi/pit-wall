@@ -55,6 +55,11 @@ server.on('collector-disconnected', () => console.log('Collector disconnected'))
 server.on('session', (data) => strategyEngine.ingestSession(data));
 
 server.on('telemetry', (values) => {
+    // Raw feed, broadcast as-is alongside the derived stint/fuel/incident
+    // messages — a hook for building new functionality against the full
+    // telemetry stream without touching strategy_engine/fuel_calculator.
+    dashboard.broadcast('telemetry', values);
+
     for (const event of strategyEngine.ingestTelemetry(values)) {
         if (event.type === 'swap') handleSwap(event).catch(console.error);
         if (event.type === 'lap') handleLap(event).catch(console.error);
