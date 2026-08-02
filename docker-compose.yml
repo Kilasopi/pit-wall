@@ -30,6 +30,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./relay
+          target: /app
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - package.json
+            - package-lock.json
+            - Dockerfile
+
+        - action: rebuild
+          path: ./relay/package.json
+
+        - action: rebuild
+          path: ./relay/package-lock.json
 
   agent:
     build:
@@ -45,6 +63,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./agent
+          target: /app/agent
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - __pycache__/
+            - "*.pyc"
+            - Dockerfile
 
   dashboard:
     build: ./dashboard
@@ -56,6 +86,24 @@ services:
     depends_on:
       - relay
       - agent
+    
+    develop:
+      watch:
+        - action: sync
+          path: ./dashboard
+          target: /app
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - package.json
+            - package-lock.json
+            - Dockerfile
+
+        - action: rebuild
+          path: ./dashboard/package.json
+
+        - action: rebuild
+          path: ./dashboard/package-lock.json
 
 volumes:
   pitwall_pgdata:
