@@ -77,28 +77,70 @@ If the collector logs `WebSocket error` or keeps reconnecting without the agent 
 ## 3. Work PC via Docker (alternative to steps 1/3 above)
 
 Instead of running `relay`/`agent`/`dashboard` individually, `docker compose up -d`
-from the repo root starts Postgres + all three together, with `db/schema.sql`
-auto-applied on first run. See `docker-compose.yml`. The collector still runs
-natively on the Sim PC either way — Docker only covers the Work PC side.
+from the repo root starts all three together, plus `cloudflared` for team access
+(see below). See `docker-compose.yml`. The collector still runs natively on the
+Sim PC either way — Docker only covers the Work PC side.
+
+There's no local Postgres container — `relay`/`agent` connect straight to the
+shared Neon database (see **Database** below). Make sure the repo-root `.env`
+exists before bringing the stack up, or `relay`/`agent` will start with an empty
+`DATABASE_URL` and every query will fail.
+
+## Database
+
+Drivers, stints, and incidents live in a single shared Postgres database hosted on
+[Neon](https://neon.tech) (free tier) — not a per-machine local database. This is
+what lets every device hitting the dashboard see the same driver roster and
+history, regardless of which one made the change.
+
+The connection string is one Neon project's `DATABASE_URL`, needed in three places:
+- `relay/.env` — for running `relay` outside Docker
+- `agent/.env` — for running `agent` outside Docker
+- repo-root `.env` (gitignored — copy `.env.example`) — read by `docker compose`
+  for variable substitution into `relay`/`agent`'s container environment
+
+All three should have the *same* value. It's a real credential (the connection
+string embeds a password) — never commit it; `.gitignore` already excludes
+`.env`/`.env.*` everywhere in the repo.
+
+If you ever need to point this at a different Neon project (or a fresh database),
+apply `db/schema.sql` to it once:
+```bash
+cd relay && npm install   # pulls in `pg`, used below
+node -e "
+const { Pool } = require('pg');
+const fs = require('fs');
+const pool = new Pool({
+  connectionString: '<your DATABASE_URL>',
+  ssl: { rejectUnauthorized: false },
+});
+pool.query(fs.readFileSync('../db/schema.sql', 'utf8'))
+  .then(() => { console.log('schema applied'); return pool.end(); });
+"
+```
 
 ## Team access
 
 The dashboard is reachable by the whole team at **https://pitwall.murder-pitwall.com**,
-via a Cloudflare named tunnel running on the Work PC. No install needed on anyone's
-end — just open the link. There's currently no login gate on it (a deliberate choice —
-treat the URL itself as the only protection; don't post it somewhere public).
+via a Cloudflare named tunnel. No install needed on anyone's end — just open the
+link. There's currently no login gate on it (a deliberate choice — treat the URL
+itself as the only protection; don't post it somewhere public).
 
-**Restarting the tunnel** (needed after a Work PC reboot, since nothing currently
-auto-starts it): the tunnel's config and credentials live in `~/.cloudflared/` on
-*this* Work PC specifically (not in this repo — `~/.cloudflared/config.yml` +
-a credentials JSON file tied to the `murder-pitwall.com` Cloudflare account). From
-any directory:
+**Running the tunnel:** `cloudflared` is one of the services in `docker-compose.yml`,
+so `docker compose up -d` starts it along with `relay`/`agent`/`dashboard` — nothing
+extra to run. It mounts `~/.cloudflared/` from the Work PC read-only (the tunnel's
+config + credentials JSON, tied to the `murder-pitwall.com` Cloudflare account) and
+proxies to the `dashboard` container over the Docker network, not `localhost`.
+
+If you're running `dashboard` outside Docker instead (`npm start` in step 1-style),
+start the tunnel separately from any directory:
 ```bash
 cloudflared tunnel run pitwall
 ```
-Leave it running in a terminal (or set it up as a background service — not yet
-done). The dashboard (`docker compose up -d` or `npm start`) needs to already be
-up on port 5173 for the tunnel to have anything to proxy to.
+The dashboard needs to already be up on port 5173 for the tunnel to have anything
+to proxy to — but check `~/.cloudflared/config.yml`'s `service:` first, since it's
+currently set to `http://dashboard:5173` (the Docker Compose service name) rather
+than `http://localhost:5173`, from wiring it into Docker.
 
 If you ever set this up on a *different* machine, you'd need to redo `cloudflared
 tunnel login` there — the credentials are per-machine, not something to copy

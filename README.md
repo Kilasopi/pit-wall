@@ -52,7 +52,9 @@ races normally with no extra software.
 - Agent: Python (`pyirsdk`)
 - Relay: Node.js + Express + `ws`
 - Dashboard: React + Tailwind + shadcn/ui
-- Persistence: Postgres (stint history, incident log)
+- Persistence: Postgres, hosted on [Neon](https://neon.tech) (managed, free tier) so
+  drivers/stints/incidents persist across every device hitting the dashboard, not
+  just the Work PC — see `INSTRUCTIONS.md`
 
 ## Scope
 
