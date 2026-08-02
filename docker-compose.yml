@@ -1,0 +1,58 @@
+# Work PC stack only — postgres, relay, agent, dashboard. The collector
+# is intentionally not here: it has to run natively on the Sim PC's
+# Windows install to reach iRacing's shared memory directly, which
+# Docker doesn't help with and only adds friction to.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pitwall
+    ports:
+      - "5432:5432"
+    volumes:
+      - pitwall_pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  relay:
+    build: ./relay
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/pitwall
+      PORT: 4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    ports:
+      - "4100:4100"
+      - "4101:4101"
+    environment:
+      AGENT_PORT: 4100
+      DASHBOARD_PORT: 4101
+      DATABASE_URL: postgres://postgres:password@postgres:5432/pitwall
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "5173:5173"
+    depends_on:
+      - relay
+      - agent
+
+volumes:
+  pitwall_pgdata:

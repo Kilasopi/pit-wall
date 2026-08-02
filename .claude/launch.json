@@ -12,6 +12,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["relay/server.js"],
       "port": 4000
+    },
+    {
+      "name": "agent",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["agent/index.js"],
+      "port": 4100
     }
   ]
 }
