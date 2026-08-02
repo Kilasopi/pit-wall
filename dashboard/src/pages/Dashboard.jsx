@@ -1,4 +1,4 @@
-import { useRelaySocket } from '@/hooks/useRelaySocket';
+import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { NavBar } from '@/components/NavBar';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -25,7 +25,7 @@ function fuelVariant(lapsRemaining) {
 }
 
 function App() {
-  const { connected, stint, fuel, incidents } = useRelaySocket();
+  const { connected, stint, fuel, incidents } = useAgentSocket();
 
   return (
     <div className="min-h-screen bg-background p-6 text-foreground">
@@ -99,6 +99,7 @@ function App() {
                   <TableRow>
                     <TableHead>Lap</TableHead>
                     <TableHead>Description</TableHead>
+                    <TableHead>Points</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -106,6 +107,15 @@ function App() {
                     <TableRow key={i}>
                       <TableCell>{incident.lap ?? '—'}</TableCell>
                       <TableCell>{incident.description}</TableCell>
+                      <TableCell>
+                        {incident.points != null ? (
+                          <Badge variant={incident.points >= 4 ? 'destructive' : 'secondary'}>
+                            {incident.points}x
+                          </Badge>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

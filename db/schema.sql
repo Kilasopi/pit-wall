@@ -12,7 +12,9 @@ CREATE TABLE incidents (
     id SERIAL PRIMARY KEY,
     logged_at TIMESTAMPTZ DEFAULT now(),
     lap INT,
-    description TEXT NOT NULL
+    description TEXT NOT NULL,
+    -- iRacing incident points for this single incident: 0x/1x/2x/4x.
+    points INT NOT NULL DEFAULT 0 CHECK (points IN (0, 1, 2, 4))
 );
 
 CREATE TABLE fuel_readings (
