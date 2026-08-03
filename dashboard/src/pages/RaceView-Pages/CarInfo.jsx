@@ -1,5 +1,7 @@
 import { FuelCard } from '@/components/datacards/FuelCard';
 import { TireWearCard } from '@/components/datacards/TireWearCard';
+import { AdjustmentsCard } from '@/components/datacards/AdjustmentsCard';
+import { BatteryCard } from '@/components/datacards/BatteryCard';
 
 function CarInfo({ telemetry }) {
   // FuelLevelPct is 0-1 straight from the SDK; FuelCard wants 0-100.
@@ -12,17 +14,24 @@ function CarInfo({ telemetry }) {
   const rearLeft = telemetry?.TireWearRearLeft;
   const rearRight = telemetry?.TireWearRearRight;
 
+  // Only GTP/LMDh cars report this — everyone else just won't have the field.
+  const hasBattery = typeof telemetry?.EnergyBattPct === 'number';
+  const batteryPercentage = hasBattery ? telemetry.EnergyBattPct * 100 : null;
+
   return (
-    <div>
-      <h1>Car Information</h1>
-      {/* Add your car information components here */}
-      <FuelCard percentage={percentage} fuelLitres={fuelLitres} />
-      <TireWearCard
-        frontLeft={frontLeft}
-        frontRight={frontRight}
-        rearLeft={rearLeft}
-        rearRight={rearRight}
-      />
+    <div className="space-y-4">
+      <h1 className="text-lg font-heading font-medium">Car Information</h1>
+      <div className="flex flex-wrap gap-4">
+        <FuelCard percentage={percentage} fuelLitres={fuelLitres} />
+        {hasBattery && <BatteryCard percentage={batteryPercentage} />}
+        <TireWearCard
+          frontLeft={frontLeft}
+          frontRight={frontRight}
+          rearLeft={rearLeft}
+          rearRight={rearRight}
+        />
+      </div>
+      <AdjustmentsCard telemetry={telemetry} />
     </div>
   );
 }
