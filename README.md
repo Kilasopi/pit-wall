@@ -1,7 +1,9 @@
 # Pit wall — iRacing endurance strategy dashboard
 
-A single-user race strategist tool for iRacing endurance events. Runs on the
-strategist's Work PC — no software required for the rest of the team.
+A race strategist tool for iRacing endurance events. Runs on the Work PC —
+no software required for the rest of the team. Supports any number of
+MURDER entries racing in separate, concurrent sessions at once, each with
+its own isolated live view (see Multi-team support below).
 
 ## Why this exists
 
@@ -12,19 +14,41 @@ the strategist spectates the session.
 
 ## What's included
 
-- **Collector** — runs on the Sim PC, reads iRacing's SDK shared memory (via
+- **Collector** — runs on each Sim PC, reads iRacing's SDK shared memory (via
   `irsdk-node`), and streams raw telemetry/session data to the agent over a
-  websocket. The only piece that has to run alongside the sim itself.
-- **Agent** — runs on the Work PC, receives the collector's stream, derives
-  stint/fuel/incident events, fetches a real track outline from iRacing's Data
-  API when available (falling back to a generic shape — see caveat below),
-  logs history to Postgres, and broadcasts live state to the dashboard.
+  websocket. The only piece that has to run alongside the sim itself; no
+  per-machine configuration needed (see Multi-team support).
+- **Agent** — runs on the Work PC, receives every collector's stream, derives
+  stint/fuel/incident events per team, fetches a real track outline from
+  iRacing's Data API when available (falling back to a generic shape — see
+  caveat below), logs history to Postgres, and broadcasts live state to the
+  dashboard.
 - **Relay** — a separate small API for the planning side: the driver roster,
   event entry list, and special events, backed by the same Postgres database.
   Not part of the live telemetry path.
-- **Dashboard (web)** — React + Tailwind + shadcn/ui, with a Race View section
-  (Live / Leaderboard / Car Info / Track Info) plus Drivers and Stint Planner
-  pages. Dark mode toggle in the nav bar.
+- **Dashboard (web)** — React + Tailwind + shadcn/ui, with a team-select
+  landing page and a Race View section per team (Live / Leaderboard /
+  Car Info / Track Info / Strategy) plus Drivers and Stint Planner pages.
+  Dark mode toggle in the nav bar.
+
+### Multi-team support
+
+Any number of MURDER entries can run in fully separate, concurrent iRacing
+sessions — the agent keeps completely independent state per team (own stint
+tracker, fuel calculator, track map, etc.), so one team's data can never
+bleed into another's.
+
+Team identity is auto-resolved, not manually configured: the agent looks at
+the car number the collector is watching and matches it against
+`entry_drivers.car_number` in the roster. Set a car number on an entry (the
+Drivers page has a "Car #" field) and whichever Sim PC's collector connects
+watching that car automatically becomes that team — no per-machine env vars,
+no separate deploys. If a car number has no roster match (e.g. testing), it
+still gets its own isolated bucket instead of colliding with anything.
+
+The dashboard's `/` page lists every team from the roster; each opens at
+`/t/<entry name>` with its own fully isolated live view, so multiple
+strategists can watch multiple teams from the same deployment.
 
 ### Race View pages
 
@@ -59,16 +83,17 @@ still live and accurate, just not plotted on the real track shape.
 ## Architecture
 
 ``` markdown
-iRacing (spectator mode, Sim PC)
-        |
-        v
-Collector  --- reads shared memory via irsdk-node, runs on the Sim PC
-        |
-        v  websocket
-Agent  --- derives stint/fuel/incidents, fetches track map, runs on the Work PC
-        |
-        v  websocket
-Dashboard  --- live view in the browser
+iRacing (Sim PC #1)         iRacing (Sim PC #2)         ...any number more
+        |                           |
+        v                           v
+Collector                      Collector          --- one per Sim PC, no config
+        |                           |
+        \___________  websocket  ___/
+                     v
+                   Agent   --- resolves each connection to a team by car
+                     |          number, keeps fully separate state per team
+                     v  websocket (tagged per team)
+                 Dashboard --- /t/<team> shows one team's isolated live view
 
 Relay  --- separate roster/entry-list/special-events API, same Postgres DB
         ^
@@ -99,6 +124,10 @@ what Docker Compose reads for variable substitution in
 `docker-compose.yml` — `agent/.env`/`relay/.env` are for running those
 services outside Docker.
 
+Apply `db/schema.sql` for a fresh database, or run everything under
+`db/migrations/` in order against an existing one to pick up new columns
+(currently just `entry_name` on the history tables, for multi-team support).
+
 For the real track map, also set `IRACING_EMAIL`/`IRACING_PASSWORD` in
 **both** `agent/.env` and the root `.env` (Compose needs its own copy) —
 though see the track map caveat above; this currently won't authenticate
@@ -107,6 +136,7 @@ until iRacing reopens OAuth client registration.
 ## Status
 
 Actively in use — collector/agent/relay/dashboard are all built and running
-against live sessions. Track map and split info are blocked on iRacing's
+against live sessions, including multi-team support (verified live against a
+real concurrent session). Track map and split info are blocked on iRacing's
 paused OAuth client registration; real verification of race-only features
 (Gap Board, multi-class Leaderboard behavior) is pending the next race event.
