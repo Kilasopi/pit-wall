@@ -20,6 +20,9 @@ import { getSessionClasses, buildLeaderboardRows } from '@/hooks/convertLeaderbo
 
 function Leaderboard({ session, telemetry }) {
   const [inactiveClassIds, setInactiveClassIds] = useState(() => new Set());
+  // Keyed by carIdx rather than driver name — carIdx is stable for the
+  // session and unambiguous, whereas names could theoretically collide.
+  const [highlightedCarIdxs, setHighlightedCarIdxs] = useState(() => new Set());
 
   const drivers = session?.DriverInfo?.Drivers ?? [];
   const classes = getSessionClasses(drivers);
@@ -33,6 +36,15 @@ function Leaderboard({ session, telemetry }) {
       const next = new Set(prev);
       if (next.has(classId)) next.delete(classId);
       else next.add(classId);
+      return next;
+    });
+  }
+
+  function toggleHighlight(carIdx) {
+    setHighlightedCarIdxs((prev) => {
+      const next = new Set(prev);
+      if (next.has(carIdx)) next.delete(carIdx);
+      else next.add(carIdx);
       return next;
     });
   }
@@ -95,7 +107,15 @@ function Leaderboard({ session, telemetry }) {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={row.carIdx}>
+                  <TableRow
+                    key={row.carIdx}
+                    onClick={() => toggleHighlight(row.carIdx)}
+                    className={cn(
+                      'cursor-pointer',
+                      highlightedCarIdxs.has(row.carIdx) &&
+                        'bg-blue-500/10 hover:bg-blue-500/15 border-l-2 border-l-blue-500'
+                    )}
+                  >
                     <TableCell>{row.position}</TableCell>
                     {isMultiClass && <TableCell>{row.classPosition}</TableCell>}
                     <TableCell>
