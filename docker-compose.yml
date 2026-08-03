@@ -46,10 +46,6 @@ services:
       AGENT_PORT: 4100
       DASHBOARD_PORT: 4101
       DATABASE_URL: ${DATABASE_URL}
-    volumes:
-      # Throwaway telemetry dump for exploring payload shapes — see
-      # agent/telemetry_dump.js. Remove this along with that file once done.
-      - ./agent/tmp-telemetry-dump:/app/agent/tmp-telemetry-dump
 
     develop:
       watch:
@@ -62,7 +58,6 @@ services:
             - __pycache__/
             - "*.pyc"
             - Dockerfile
-            - tmp-telemetry-dump/
 
   dashboard:
     build: ./dashboard

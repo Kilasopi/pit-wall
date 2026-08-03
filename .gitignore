@@ -20,4 +20,3 @@ npm-debug.log*
 .idea
 .DS_Store
 *.local
-agent/tmp-telemetry-dump/

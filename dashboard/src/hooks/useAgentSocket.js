@@ -9,6 +9,7 @@ const initialState = {
   fuel: null,
   incidents: [],
   telemetry: null,
+  session: null,
 };
 
 function reducer(state, event) {
@@ -25,6 +26,9 @@ function reducer(state, event) {
       return { ...state, incidents: [event.data, ...state.incidents] };
     case 'telemetry':
       return { ...state, telemetry: event.data };
+    case 'session':
+      return { ...state, session: event.data };
+
     default:
       return state;
   }
