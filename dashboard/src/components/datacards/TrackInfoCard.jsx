@@ -33,10 +33,9 @@ export function TrackInfoCard({
     sessionState,
     flagsText,
     flagsClassName,
-    rawSessionFlags,
     sections,
-    hasSectionWarning,
-    sectionSummary,
+    cautionText,
+    cautionClassName,
 
     skies,
     skiesIcon: SkiesIcon,
@@ -126,25 +125,18 @@ export function TrackInfoCard({
                     </div>
                     <Card className="overflow-hidden py-0 gap-0">
                         <CardHeader
-                            className={`flex items-center justify-between rounded-t-xl px-2 py-2 ${
-                                hasSectionWarning
-                                    ? 'bg-yellow-400 text-black'
-                                    : (flagsClassName ?? 'bg-gray-500 text-white')
+                            className={`flex flex-col gap-1 rounded-t-xl px-2 py-2 ${
+                                cautionClassName ?? 'bg-gray-500 text-white'
                             }`}
                         >
                             <CardTitle className="flex items-center gap-1">
-                                {hasSectionWarning && <span aria-hidden="true">⚠</span>}
-                                <span>{hasSectionWarning ? 'LOCAL YELLOW' : (flagsText ?? 'TRACK CLEAR')}</span>
+                                {cautionText !== 'TRACK CLEAR' && <span aria-hidden="true">⚠</span>}
+                                <span>{cautionText ?? 'TRACK CLEAR'}</span>
                             </CardTitle>
-                            <span className="text-xs font-normal opacity-80">
-                                FLAGS: {rawSessionFlags ?? '—'}
-                            </span>
+                            <CardDescription className="text-[10px] opacity-80">
+                                Inferred from timing sections, car positions and per-car flags.
+                            </CardDescription>
                         </CardHeader>
-                        <CardContent className="px-2 py-2">
-                            <p className="text-sm text-muted-foreground">
-                                {hasSectionWarning ? sectionSummary : 'No active warnings'}
-                            </p>
-                        </CardContent>
                         {sections?.length > 0 && (
                             <div
                                 className="grid border-t"
@@ -152,18 +144,22 @@ export function TrackInfoCard({
                             >
                                 {sections.map((section) => (
                                     <div
-                                        key={section.label}
+                                        key={section.section}
                                         className={`border-r px-2 py-2 text-center last:border-r-0 ${
-                                            section.status === 'yellow'
-                                                ? 'bg-yellow-400 text-black'
-                                                : 'bg-green-600/10 text-muted-foreground'
+                                            section.status === 'clear'
+                                                ? 'bg-green-600/10 text-muted-foreground'
+                                                : 'bg-yellow-400 text-black'
                                         }`}
                                     >
                                         <div className="text-[10px] font-semibold tracking-wide">
-                                            {section.label}
+                                            SECTION {section.section}
                                         </div>
                                         <div className="text-xs font-bold uppercase">
-                                            {section.status}
+                                            {section.status === 'clear'
+                                                ? 'CLEAR'
+                                                : section.status === 'waving'
+                                                  ? 'WAVING YELLOW'
+                                                  : 'YELLOW'}
                                         </div>
                                     </div>
                                 ))}

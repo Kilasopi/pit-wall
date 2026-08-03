@@ -1,3 +1,4 @@
+import { useMemo, useRef } from "react";
 import {
     Sun,
     CloudSun,
@@ -170,28 +171,130 @@ export function convertSessionFlags(flags) {
     };
 }
 
-// No iRacing telemetry field reports which track section a local yellow is
-// in — SessionFlags is a single global bitmask. This builds a per-section
-// display from a `sectionFlags` array of booleans (true = yellow) so the UI
-// is ready to plug into a real source (spotter input, corner-worker data,
-// etc.) once one exists; until then callers can pass an all-clear array.
-export function convertSectionFlags(sectionFlags) {
-    const sections = (sectionFlags ?? []).map((isYellow, index) => ({
-        label: `SECTION ${index + 1}`,
-        status: isYellow ? 'yellow' : 'clear',
-    }));
+// How long a detected local-yellow section stays active after its last
+// detection tick before reverting to clear. Telemetry arrives frequently
+// (the agent broadcasts at 10Hz), so a single missed or borderline tick
+// shouldn't be enough to flicker a section back to green.
+const LOCAL_YELLOW_HOLD_MS = 3000;
 
-    const yellowSections = sections.filter((s) => s.status === 'yellow');
+// iRacing's SplitTimeInfo.Sectors gives the official timing-section
+// boundaries (SectorStartPct, ascending starting at 0) but there's no SDK
+// field for which section a local yellow is in — this infers it from
+// whichever cars currently carry a local-yellow CarIdxSessionFlags bit and
+// where their CarIdxLapDistPct falls within those boundaries.
+function getSectionBoundaries(session) {
+    const sectors = session?.SplitTimeInfo?.Sectors;
+    if (!Array.isArray(sectors) || sectors.length === 0) return [0];
+    return sectors.map((sector) => sector?.SectorStartPct ?? 0);
+}
 
-    const summary = yellowSections.length === 0
-        ? 'No active warnings'
-        : `Yellow detected in ${yellowSections.map((s) => s.label[0] + s.label.slice(1).toLowerCase()).join(', ')}`;
+// boundaries is assumed ascending starting at 0 (iRacing's own ordering) —
+// finds the last boundary at or before pct.
+function findSectionIndex(pct, boundaries) {
+    let index = 0;
+    for (let i = 0; i < boundaries.length; i++) {
+        if (boundaries[i] <= pct) index = i;
+        else break;
+    }
+    return index;
+}
 
-    return {
-        sections,
-        hasWarning: yellowSections.length > 0,
-        summary,
-    };
+// One tick's worth of per-car scanning: which sections currently have a car
+// carrying a local-yellow flag. Only the two local-yellow bits count here —
+// full-course caution is handled separately in isFullCourseCaution so a
+// global caution (which iRacing may mirror onto every car's
+// CarIdxSessionFlags) never gets miscounted as a local yellow.
+function collectLocalYellowCars(telemetry, boundaries) {
+    const buckets = boundaries.map(() => ({ carIdxs: [], waving: false }));
+
+    const carFlags = telemetry?.CarIdxSessionFlags;
+    if (!Array.isArray(carFlags)) return buckets;
+
+    const lapDistPct = telemetry?.CarIdxLapDistPct ?? [];
+    const trackSurface = telemetry?.CarIdxTrackSurface ?? [];
+    const onPitRoad = telemetry?.CarIdxOnPitRoad ?? [];
+
+    carFlags.forEach((flags, carIdx) => {
+        if (flags == null) return;
+
+        const isYellow = (flags & SessionFlags.yellow) !== 0;
+        const isYellowWaving = (flags & SessionFlags.yellowWaving) !== 0;
+        if (!isYellow && !isYellowWaving) return;
+
+        const pct = lapDistPct[carIdx];
+        if (pct == null || !Number.isFinite(pct) || pct < 0) return;
+        if (trackSurface[carIdx] === -1) return;
+        if (onPitRoad[carIdx]) return;
+
+        const bucket = buckets[findSectionIndex(pct, boundaries)];
+        bucket.carIdxs.push(carIdx);
+        if (isYellowWaving) bucket.waving = true;
+    });
+
+    return buckets;
+}
+
+export function isFullCourseCaution(sessionFlags) {
+    if (sessionFlags == null || !Number.isFinite(sessionFlags)) return false;
+    return (sessionFlags & (SessionFlags.caution | SessionFlags.cautionWaving)) !== 0;
+}
+
+// Debounced, per-section local-yellow state — recomputed every render (i.e.
+// every telemetry tick), holding each section's warning active for
+// LOCAL_YELLOW_HOLD_MS after its last detection so the UI doesn't flicker.
+export function useSectionCautionState(session, telemetry) {
+    const boundaries = useMemo(
+        () => getSectionBoundaries(session),
+        [session?.SplitTimeInfo?.Sectors]
+    );
+
+    const rawBuckets = useMemo(
+        () => collectLocalYellowCars(telemetry, boundaries),
+        [
+            telemetry?.CarIdxSessionFlags,
+            telemetry?.CarIdxLapDistPct,
+            telemetry?.CarIdxTrackSurface,
+            telemetry?.CarIdxOnPitRoad,
+            boundaries,
+        ]
+    );
+
+    const heldRef = useRef({});
+    const now = Date.now();
+
+    const sections = rawBuckets.map((bucket, index) => {
+        if (bucket.carIdxs.length > 0) {
+            heldRef.current[index] = { at: now, waving: bucket.waving, carIdxs: bucket.carIdxs };
+        }
+
+        const held = heldRef.current[index];
+        const isActive = held != null && now - held.at < LOCAL_YELLOW_HOLD_MS;
+
+        return {
+            section: index + 1,
+            status: isActive ? (held.waving ? 'waving' : 'yellow') : 'clear',
+            carIdxs: isActive ? held.carIdxs : [],
+        };
+    });
+
+    const fullCourseCaution = isFullCourseCaution(telemetry?.SessionFlags);
+    const localYellowSections = sections.filter((s) => s.status !== 'clear');
+
+    return { sections, fullCourseCaution, localYellowSections };
+}
+
+export function formatCautionStripText(fullCourseCaution, localYellowSections) {
+    if (fullCourseCaution) return 'FULL COURSE CAUTION';
+    if (localYellowSections.length > 0) {
+        return `LOCAL YELLOW — ${localYellowSections.map((s) => `SECTION ${s.section}`).join(', ')}`;
+    }
+    return 'TRACK CLEAR';
+}
+
+export function cautionStripClassName(fullCourseCaution, localYellowSections) {
+    if (fullCourseCaution) return 'bg-yellow-500 text-black';
+    if (localYellowSections.length > 0) return 'bg-yellow-400 text-black';
+    return 'bg-green-600 text-white';
 }
 
 export function formatTimeRemaining(totalSeconds) {
