@@ -24,14 +24,13 @@ class IracingReader extends EventEmitter {
         super();
         this._sdk = new IRacingSDK();
         this._telemetryPollRateMs = telemetryPollRateMs ?? Math.round(1000 / 60);
-        // How often to actually emit telemetry, independent of the SDK's own
-        // currDataVersion counter — gating on that counter meant a stall
-        // there (e.g. during a rolling-start/formation-lap transition) froze
-        // the whole telemetry stream even though the SDK was still reachable
-        // and session data kept updating. Fetching unconditionally on a
-        // timer, same as session below, means the dashboard always gets
-        // whatever the SDK currently reports rather than silently going
-        // stale on the last "changed" frame.
+        // Heartbeat rate for telemetry, independent of the SDK's own
+        // currDataVersion counter — gating solely on that counter meant a
+        // stall there (e.g. during a rolling-start/formation-lap transition)
+        // froze the whole telemetry stream even though the SDK was still
+        // reachable and session data kept updating. This is a ceiling, not
+        // the only trigger: flag changes below bypass it and emit
+        // immediately, since those can be shorter-lived than this interval.
         this._telemetryFetchRateMs = telemetryFetchRateMs ?? 1000;
         this._sessionPollRateMs = sessionPollRateMs ?? 1000;
 
@@ -40,6 +39,7 @@ class IracingReader extends EventEmitter {
         this._lastTelemetryFetchAt = 0;
         this._lastSessionFetchAt = 0;
         this._lastSessionOk = false;
+        this._lastFlagsSignature = null;
     }
 
     start() {
@@ -66,10 +66,20 @@ class IracingReader extends EventEmitter {
 
         if (sessionOk && this._sdk.waitForData(this._telemetryPollRateMs)) {
             const now = Date.now();
+            const flat = flattenTelemetry(this._sdk.getTelemetry());
 
-            if (now - this._lastTelemetryFetchAt >= this._telemetryFetchRateMs) {
+            // Flag state (a local yellow on a specific car, a caution being
+            // thrown) can flip for less than a second — shorter than the
+            // heartbeat below — so it's checked and emitted on every tick,
+            // independent of the heartbeat timer, to make sure a brief flag
+            // pulse between heartbeats can't be missed entirely.
+            const flagsSignature = JSON.stringify([flat.SessionFlags, flat.CarIdxSessionFlags]);
+            const flagsChanged = flagsSignature !== this._lastFlagsSignature;
+            this._lastFlagsSignature = flagsSignature;
+
+            if (flagsChanged || now - this._lastTelemetryFetchAt >= this._telemetryFetchRateMs) {
                 this._lastTelemetryFetchAt = now;
-                this.emit('telemetry', flattenTelemetry(this._sdk.getTelemetry()));
+                this.emit('telemetry', flat);
             }
 
             if (now - this._lastSessionFetchAt >= this._sessionPollRateMs) {
