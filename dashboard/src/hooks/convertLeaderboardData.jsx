@@ -76,6 +76,7 @@ export function buildLeaderboardRows(drivers, telemetry) {
         classColor: classColorToCss(driver.CarClassColor),
         classShortName: driver.CarClassShortName ?? driver.CarClassName ?? `Class ${driver.CarClassID}`,
         carNumber: driver.CarNumber,
+        carName: driver.CarScreenName ?? '—',
         driverName: driver.UserName,
         teamName: driver.TeamName ?? '—',
         iRating: driver.IRating ?? null,

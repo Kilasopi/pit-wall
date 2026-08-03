@@ -29,7 +29,12 @@ function Leaderboard({ session, telemetry }) {
   // Persisted per team so a refresh (or navigating away and back) doesn't
   // lose which drivers were highlighted — reloads whenever the team
   // changes too, so switching teams doesn't leak the previous team's
-  // highlights.
+  // highlights. Writes only happen from toggleHighlight itself (not a
+  // generic "sync state to storage" effect) — a separate save-on-change
+  // effect races the load effect above on mount (worse under StrictMode's
+  // double effect invocation, which this app's dev server always runs
+  // under) and can write back the still-empty initial state, silently
+  // wiping out whatever had just been loaded.
   useEffect(() => {
     if (!teamId) return;
     let stored = null;
@@ -40,18 +45,6 @@ function Leaderboard({ session, telemetry }) {
     }
     setHighlightedCarIdxs(new Set(stored ? JSON.parse(stored) : []));
   }, [teamId]);
-
-  useEffect(() => {
-    if (!teamId) return;
-    try {
-      localStorage.setItem(
-        `pitwall-leaderboard-highlights-${teamId}`,
-        JSON.stringify([...highlightedCarIdxs])
-      );
-    } catch {
-      // localStorage unavailable — highlights just won't persist this session.
-    }
-  }, [teamId, highlightedCarIdxs]);
 
   const drivers = session?.DriverInfo?.Drivers ?? [];
   const classes = getSessionClasses(drivers);
@@ -74,6 +67,15 @@ function Leaderboard({ session, telemetry }) {
       const next = new Set(prev);
       if (next.has(carIdx)) next.delete(carIdx);
       else next.add(carIdx);
+
+      if (teamId) {
+        try {
+          localStorage.setItem(`pitwall-leaderboard-highlights-${teamId}`, JSON.stringify([...next]));
+        } catch {
+          // localStorage unavailable — highlights just won't persist this session.
+        }
+      }
+
       return next;
     });
   }
@@ -122,6 +124,7 @@ function Leaderboard({ session, telemetry }) {
                   {isMultiClass && <TableHead>Class Pos</TableHead>}
                   <TableHead>Class</TableHead>
                   <TableHead>Car #</TableHead>
+                  <TableHead>Car</TableHead>
                   <TableHead>Driver</TableHead>
                   <TableHead>Team</TableHead>
                   <TableHead>iRating</TableHead>
@@ -157,6 +160,7 @@ function Leaderboard({ session, telemetry }) {
                       </span>
                     </TableCell>
                     <TableCell>#{row.carNumber ?? '—'}</TableCell>
+                    <TableCell>{row.carName}</TableCell>
                     <TableCell>{row.driverName ?? '—'}</TableCell>
                     <TableCell>{row.teamName}</TableCell>
                     <TableCell>{row.iRating ?? '—'}</TableCell>
