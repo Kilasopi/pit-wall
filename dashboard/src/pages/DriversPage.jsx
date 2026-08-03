@@ -251,12 +251,88 @@ function EntryDriversCard() {
   );
 }
 
+// Sets up a car #0 "Spectating" roster driver + entry in one click, so
+// there's something for the agent's car-number roster lookup to resolve to
+// when the Sim PC is just spectating rather than driving a real team's
+// entry (see agent/index.js resolveTeamId). Idempotent — re-clicking finds
+// and reuses the existing "Spectating" driver/entry instead of piling up
+// duplicates.
+function QuickStartButton() {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function quickStart() {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const rosterRes = await fetch(`${RELAY_HTTP_URL}/api/murder-drivers`);
+      if (!rosterRes.ok) throw new Error(`${rosterRes.status} ${rosterRes.statusText}`);
+      const roster = await rosterRes.json();
+      let driver = roster.find((d) => d.name === 'Spectating');
+
+      if (!driver) {
+        const createRes = await fetch(`${RELAY_HTTP_URL}/api/murder-drivers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Spectating' }),
+        });
+        if (!createRes.ok) throw new Error(`${createRes.status} ${createRes.statusText}`);
+        driver = await createRes.json();
+      }
+
+      const entriesRes = await fetch(`${RELAY_HTTP_URL}/api/entry-drivers`);
+      if (!entriesRes.ok) throw new Error(`${entriesRes.status} ${entriesRes.statusText}`);
+      const entries = await entriesRes.json();
+      const alreadyExists = entries.some(
+        (e) =>
+          e.event_name === 'Spectating' && e.entry_name === 'Spectating' && e.driver_id === driver.id
+      );
+
+      if (!alreadyExists) {
+        const entryRes = await fetch(`${RELAY_HTTP_URL}/api/entry-drivers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driverId: driver.id,
+            guestName: null,
+            eventName: 'Spectating',
+            entryName: 'Spectating',
+            carNumber: '0',
+            carType: null,
+          }),
+        });
+        if (!entryRes.ok) throw new Error(`${entryRes.status} ${entryRes.statusText}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Quick start failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        size="sm"
+        onClick={quickStart}
+        disabled={submitting}
+        title="Creates a car #0 'Spectating' driver and entry so the pit wall has something to resolve to while just watching"
+      >
+        {submitting ? 'Setting up…' : 'Quick Start'}
+      </Button>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 function DriversPage() {
   return (
-    
+
     <div className="min-h-screen bg-background p-6 text-foreground">
       <div className="mb-2 flex items-center justify-between">
         <h1 className="text-xl font-heading font-medium">Team M.U.R.D.E.R</h1>
+        <QuickStartButton />
       </div>
       <NavBar />
 
