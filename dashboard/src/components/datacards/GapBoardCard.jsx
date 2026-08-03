@@ -22,7 +22,7 @@ export function GapBoardCard({ session, telemetry }) {
       <CardHeader>
         <CardTitle>Gap Board</CardTitle>
         <CardDescription>
-          {board ? 'Next same-class car ahead' : hasSession ? 'Not currently driving' : 'No session data yet'}
+          {board ? 'Nearest same-class cars ahead and behind' : hasSession ? 'Not currently driving' : 'No session data yet'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -33,53 +33,123 @@ export function GapBoardCard({ session, telemetry }) {
             You're not in a car with a race position right now (spectating, in the pits before
             the green flag, etc.) — this fills in once you're on track.
           </p>
-        ) : !board.classCarAhead ? (
-          <p className="text-sm text-muted-foreground">
-            You're the class leader — no same-class car ahead.
-          </p>
         ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className="size-2.5 rounded-full"
-                  style={{ backgroundColor: board.classCarAhead.classColor }}
-                />
-                <span className="font-medium">
-                  #{board.classCarAhead.carNumber ?? '—'} {board.classCarAhead.driverName ?? '—'}
-                </span>
-                <Badge variant="outline">P{board.classCarAhead.classPosition} in class</Badge>
-              </div>
-              <span className="text-lg font-semibold tabular-nums">{board.gap}</span>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Ahead
+              </p>
+              {!board.classCarAhead ? (
+                <p className="text-sm text-muted-foreground">
+                  You're the class leader — no same-class car ahead.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="size-2.5 rounded-full"
+                        style={{ backgroundColor: board.classCarAhead.classColor }}
+                      />
+                      <span className="font-medium">
+                        #{board.classCarAhead.carNumber ?? '—'} {board.classCarAhead.driverName ?? '—'}
+                      </span>
+                      <Badge variant="outline">P{board.classCarAhead.classPosition} in class</Badge>
+                    </div>
+                    <span className="text-lg font-semibold tabular-nums">{board.gap}</span>
+                  </div>
+
+                  {board.trafficCount === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Clear track — no traffic in between.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-sm text-muted-foreground">
+                        {board.trafficCount} car{board.trafficCount === 1 ? '' : 's'} of traffic in
+                        between:
+                      </p>
+                      <ul className="space-y-1">
+                        {board.traffic.map((car) => (
+                          <li
+                            key={car.carIdx}
+                            className="flex items-center justify-between text-sm text-muted-foreground"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="size-2 rounded-full"
+                                style={{ backgroundColor: car.classColor }}
+                              />
+                              #{car.carNumber ?? '—'} {car.driverName ?? '—'}
+                              <span className="text-xs">({car.classShortName})</span>
+                            </span>
+                            <span className="tabular-nums">{car.interval}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            {board.trafficCount === 0 ? (
-              <p className="text-sm text-muted-foreground">Clear track — no traffic in between.</p>
-            ) : (
-              <div className="space-y-1.5">
+            <div className="space-y-3 border-t pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Behind
+              </p>
+              {!board.classCarBehind ? (
                 <p className="text-sm text-muted-foreground">
-                  {board.trafficCount} car{board.trafficCount === 1 ? '' : 's'} of traffic in between:
+                  You're last in class — no same-class car behind.
                 </p>
-                <ul className="space-y-1">
-                  {board.traffic.map((car) => (
-                    <li
-                      key={car.carIdx}
-                      className="flex items-center justify-between text-sm text-muted-foreground"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="size-2 rounded-full"
-                          style={{ backgroundColor: car.classColor }}
-                        />
-                        #{car.carNumber ?? '—'} {car.driverName ?? '—'}
-                        <span className="text-xs">({car.classShortName})</span>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="size-2.5 rounded-full"
+                        style={{ backgroundColor: board.classCarBehind.classColor }}
+                      />
+                      <span className="font-medium">
+                        #{board.classCarBehind.carNumber ?? '—'} {board.classCarBehind.driverName ?? '—'}
                       </span>
-                      <span className="tabular-nums">{car.interval}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                      <Badge variant="outline">P{board.classCarBehind.classPosition} in class</Badge>
+                    </div>
+                    <span className="text-lg font-semibold tabular-nums">{board.gapBehind}</span>
+                  </div>
+
+                  {board.trafficBehindCount === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Clear track — no traffic in between.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-sm text-muted-foreground">
+                        {board.trafficBehindCount} car{board.trafficBehindCount === 1 ? '' : 's'} of
+                        traffic in between:
+                      </p>
+                      <ul className="space-y-1">
+                        {board.trafficBehind.map((car) => (
+                          <li
+                            key={car.carIdx}
+                            className="flex items-center justify-between text-sm text-muted-foreground"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="size-2 rounded-full"
+                                style={{ backgroundColor: car.classColor }}
+                              />
+                              #{car.carNumber ?? '—'} {car.driverName ?? '—'}
+                              <span className="text-xs">({car.classShortName})</span>
+                            </span>
+                            <span className="tabular-nums">{car.interval}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

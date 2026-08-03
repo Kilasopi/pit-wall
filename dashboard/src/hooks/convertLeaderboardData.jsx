@@ -18,6 +18,25 @@ export function formatGap(seconds, isLeader) {
   return `+${seconds.toFixed(3)}`;
 }
 
+// A lapped car's gap is a lap count, not a time — a stale/meaningless
+// F2Time diff otherwise (iRacing doesn't zero it out across a lap
+// difference). lapsDown is however many whole laps behind the reference
+// point (leader, or the car ahead) this row already is.
+export function formatGapOrLaps(seconds, isLeader, lapsDown) {
+  if (isLeader) return 'Leader';
+  if (lapsDown > 0) return `-${lapsDown} Lap${lapsDown > 1 ? 's' : ''}`;
+  return formatGap(seconds, isLeader);
+}
+
+// CarIdxLap is -1 before a car has completed its first lap (sitting on
+// the grid, out lap not yet done, etc.) — not a real lap count, so it
+// can't be diffed against another car's lap without producing a
+// meaningless "-26 Laps"-style result.
+function lapsBehind(referenceLap, lap) {
+  if (referenceLap == null || lap == null || referenceLap < 0 || lap < 0) return 0;
+  return Math.max(0, referenceLap - lap);
+}
+
 // Unique car classes present in the session, in first-seen order.
 export function getSessionClasses(drivers) {
   const seen = new Map();
@@ -76,6 +95,8 @@ export function buildLeaderboardRows(drivers, telemetry) {
 
   // Interval = this car's gap to leader minus the car ahead's gap to
   // leader — iRacing doesn't broadcast a direct car-to-car interval field.
+  const leaderLap = rows[0]?.lap ?? 0;
+
   return rows.map((row, i) => {
     const isLeader = row.position === 1;
     const carAhead = rows[i - 1];
@@ -84,10 +105,13 @@ export function buildLeaderboardRows(drivers, telemetry) {
         ? row.gapToLeaderSeconds - carAhead.gapToLeaderSeconds
         : null;
 
+    const lapsDown = lapsBehind(leaderLap, row.lap);
+    const lapsBehindCarAhead = carAhead ? lapsBehind(carAhead.lap, row.lap) : 0;
+
     return {
       ...row,
-      gapToLeader: formatGap(row.gapToLeaderSeconds, isLeader),
-      interval: isLeader ? '—' : formatGap(interval, false),
+      gapToLeader: formatGapOrLaps(row.gapToLeaderSeconds, isLeader, lapsDown),
+      interval: isLeader ? '—' : formatGapOrLaps(interval, false, lapsBehindCarAhead),
     };
   });
 }
@@ -116,16 +140,41 @@ export function buildGapBoard(drivers, telemetry, playerCarIdx) {
   // Walked backwards (closest to player first) — flip to running order.
   traffic.reverse();
 
+  let classCarBehind = null;
+  const trafficBehind = [];
+  for (let i = playerIndex + 1; i < rows.length; i++) {
+    const candidate = rows[i];
+    if (candidate.classId === player.classId) {
+      classCarBehind = candidate;
+      break;
+    }
+    trafficBehind.push(candidate);
+  }
+  // Walked forward, already in running order — no reverse needed here.
+
   const gapSeconds =
     classCarAhead && player.gapToLeaderSeconds != null && classCarAhead.gapToLeaderSeconds != null
       ? player.gapToLeaderSeconds - classCarAhead.gapToLeaderSeconds
       : null;
+  const lapsDownAhead = classCarAhead ? lapsBehind(classCarAhead.lap, player.lap) : 0;
+
+  const gapBehindSeconds =
+    classCarBehind && player.gapToLeaderSeconds != null && classCarBehind.gapToLeaderSeconds != null
+      ? classCarBehind.gapToLeaderSeconds - player.gapToLeaderSeconds
+      : null;
+  const lapsDownBehind = classCarBehind ? lapsBehind(player.lap, classCarBehind.lap) : 0;
 
   return {
     player,
     classCarAhead,
-    gap: classCarAhead ? formatGap(gapSeconds, false) : 'Class leader',
+    gap: classCarAhead ? formatGapOrLaps(gapSeconds, false, lapsDownAhead) : 'Class leader',
     traffic,
     trafficCount: traffic.length,
+    classCarBehind,
+    gapBehind: classCarBehind
+      ? formatGapOrLaps(gapBehindSeconds, false, lapsDownBehind)
+      : 'Last in class',
+    trafficBehind,
+    trafficBehindCount: trafficBehind.length,
   };
 }
