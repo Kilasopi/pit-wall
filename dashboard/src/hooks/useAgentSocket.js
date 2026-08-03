@@ -8,6 +8,7 @@ const initialState = {
   stint: null,
   fuel: null,
   incidents: [],
+  stintHistory: [],
   telemetry: null,
   session: null,
   trackMap: null,
@@ -25,6 +26,8 @@ function reducer(state, event) {
       return { ...state, fuel: event.data };
     case 'incident':
       return { ...state, incidents: [event.data, ...state.incidents] };
+    case 'stintClosed':
+      return { ...state, stintHistory: [event.data, ...state.stintHistory] };
     case 'telemetry':
       return { ...state, telemetry: event.data };
     case 'session':

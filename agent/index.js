@@ -14,6 +14,7 @@ const storage = config.databaseUrl ? createStorage(config.databaseUrl) : null;
 const trackMapService = new TrackMapService(config);
 
 let currentStintId = null;
+let currentStintSummary = null;
 let lastLapsCompleted = 0;
 let lastTelemetryBroadcastAt = 0;
 let lastTrackMapId = null;
@@ -40,18 +41,29 @@ async function handleTrackMap(trackId) {
 }
 
 async function handleSwap({ driver, carNumber, carName }) {
+    const endedAt = new Date();
+
+    if (currentStintSummary) {
+        dashboard.broadcast('stintClosed', {
+            ...currentStintSummary,
+            endedAt,
+            lapsCompleted: lastLapsCompleted,
+        });
+    }
+
     if (currentStintId !== null && storage) {
         await storage.closeStint(currentStintId, {
-            endedAt: new Date(),
+            endedAt,
             lapsCompleted: lastLapsCompleted,
         });
     }
 
     lastLapsCompleted = 0;
+    currentStintSummary = { driver, carNumber, carName, startedAt: endedAt };
     dashboard.broadcast('stint', { driver, carNumber, carName, lapsCompleted: 0 });
 
     if (storage) {
-        currentStintId = await storage.openStint({ driver, carNumber, startedAt: new Date() });
+        currentStintId = await storage.openStint({ driver, carNumber, startedAt: endedAt });
     }
 }
 

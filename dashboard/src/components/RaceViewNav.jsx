@@ -6,6 +6,7 @@ const links = [
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/carinfo', label: 'Car Info' },
   { to: '/trackinfo', label: 'Track Info' },
+  { to: '/strategy', label: 'Strategy' },
 ];
 
 export function RaceViewNav() {
