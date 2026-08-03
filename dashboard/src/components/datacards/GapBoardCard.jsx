@@ -10,7 +10,10 @@ import { buildGapBoard } from '@/hooks/convertLeaderboardData';
 
 export function GapBoardCard({ session, telemetry }) {
   const drivers = session?.DriverInfo?.Drivers ?? [];
-  const playerCarIdx = session?.DriverInfo?.DriverCarIdx;
+  // CamCarIdx, not DriverInfo.DriverCarIdx — this rig spectates via camera
+  // rather than driving a fixed session slot, and DriverCarIdx doesn't
+  // follow the camera (see agent/strategy_engine.js for the same reasoning).
+  const playerCarIdx = telemetry?.CamCarIdx;
   const hasSession = drivers.length > 0;
   const board = buildGapBoard(drivers, telemetry, playerCarIdx);
 

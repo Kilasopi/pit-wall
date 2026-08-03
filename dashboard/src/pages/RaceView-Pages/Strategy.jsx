@@ -82,7 +82,8 @@ function StintHistoryCard({ stint, stintHistory }) {
 
 function PitCycleTrackerCard({ session, telemetry }) {
   const drivers = session?.DriverInfo?.Drivers ?? [];
-  const playerCarIdx = session?.DriverInfo?.DriverCarIdx;
+  // CamCarIdx, not DriverInfo.DriverCarIdx — see GapBoardCard.jsx for why.
+  const playerCarIdx = telemetry?.CamCarIdx;
   const tracker = usePitCycleTracker(telemetry);
 
   const allRows = buildLeaderboardRows(drivers, telemetry);

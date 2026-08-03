@@ -37,7 +37,8 @@ export function TrackMapCard({ trackMap, telemetry, session }) {
   }, [trackPath]);
 
   const drivers = session?.DriverInfo?.Drivers ?? [];
-  const playerCarIdx = session?.DriverInfo?.DriverCarIdx;
+  // CamCarIdx, not DriverInfo.DriverCarIdx — see GapBoardCard.jsx for why.
+  const playerCarIdx = telemetry?.CamCarIdx;
   const lapDistPct = telemetry?.CarIdxLapDistPct;
   const trackSurface = telemetry?.CarIdxTrackSurface;
 
