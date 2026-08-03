@@ -35,6 +35,8 @@ class AgentWebSocketServer extends EventEmitter {
                     this.emit('session', message.payload, ws);
                 } else if (message.type === MESSAGE_TYPES.IRACING_STATUS) {
                     this.emit('iracing-status', message.payload, ws);
+                } else if (message.type === MESSAGE_TYPES.HELLO) {
+                    this.emit('hello', message.payload, ws);
                 }
             });
 

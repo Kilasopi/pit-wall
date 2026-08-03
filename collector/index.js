@@ -6,7 +6,13 @@ const { attachCommandReceiver } = require('./command_receiver');
 const reader = new IracingReader(config);
 const sender = new TelemetrySender(config);
 
-sender.on('connected', () => console.log(`Connected to agent at ${config.agentUrl}`));
+sender.on('connected', () => {
+    console.log(`Connected to agent at ${config.agentUrl}`);
+    if (config.teamOverride) {
+        console.log(`Pinning this connection to team "${config.teamOverride}"`);
+        sender.sendHello(config.teamOverride);
+    }
+});
 sender.on('disconnected', () => console.log('Disconnected from agent, reconnecting...'));
 sender.on('error', (err) => console.error('WebSocket error:', err.message));
 

@@ -5,6 +5,7 @@ const MESSAGE_TYPES = {
     SESSION: 'session',
     COMMAND: 'command',
     IRACING_STATUS: 'iracingStatus',
+    HELLO: 'hello',
 };
 
 function createMessage(type, payload) {

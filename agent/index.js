@@ -180,6 +180,32 @@ server.on('iracing-status', ({ connected }, ws) => {
     }
 });
 
+// Lets a spectator-only rig pin itself to a fixed team id up front instead
+// of going through resolveTeamId, which buckets by whichever real car the
+// camera happens to be on — that's fine for an actual entry, but useless
+// for a rig that's just watching a race to test the app, since the camera
+// (and therefore the resolved car number) can change constantly.
+server.on('hello', ({ teamOverride }, ws) => {
+    const connState = connections.get(ws);
+    if (!connState || !teamOverride || connState.teamId) return;
+
+    connState.teamId = teamOverride;
+    console.log(`Collector pinned to team "${teamOverride}"`);
+
+    const team = getOrCreateTeam(teamOverride);
+    team.collectorConnected = true;
+    team.iracingConnected = connState.iracingConnected;
+    dashboard.broadcast('collector', true, teamOverride);
+    dashboard.broadcast('iracingSession', connState.iracingConnected, teamOverride);
+
+    if (connState.latestSession) {
+        team.strategyEngine.ingestSession(connState.latestSession);
+        team.lastSession = connState.latestSession;
+        dashboard.broadcast('session', connState.latestSession, teamOverride);
+        handleTrackMap(teamOverride, connState.latestSession?.WeekendInfo?.TrackID);
+    }
+});
+
 // A dashboard tab connecting now (including a refresh) missed every
 // broadcast that already happened — telemetry/session/fuel/stint only
 // ever go out when they change or on their own poll cadence, never

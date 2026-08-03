@@ -56,6 +56,10 @@ class TelemetrySender extends EventEmitter {
         this._send(createMessage(MESSAGE_TYPES.IRACING_STATUS, { connected }));
     }
 
+    sendHello(teamOverride) {
+        this._send(createMessage(MESSAGE_TYPES.HELLO, { teamOverride }));
+    }
+
     _send(message) {
         if (this._ws && this._ws.readyState === WebSocket.OPEN) {
             this._ws.send(JSON.stringify(message));
