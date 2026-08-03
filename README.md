@@ -1,7 +1,7 @@
 # Pit wall — iRacing endurance strategy dashboard
 
-A single-user race strategist tool for iRacing endurance events. Runs entirely on the
-strategist's machine — no software required for the rest of the team.
+A single-user race strategist tool for iRacing endurance events. Runs on the
+strategist's Work PC — no software required for the rest of the team.
 
 ## Why this exists
 
@@ -12,68 +12,101 @@ the strategist spectates the session.
 
 ## What's included
 
-- **Telemetry agent** — connects to iRacing (in spectator mode) and reads live
-  session data: car positions, lap counts, gaps, and pit road status for the whole
-  field via the SDK's shared memory interface.
-- **Relay server** — receives telemetry from the agent, computes derived stats,
-  logs stint and incident history to a database, and broadcasts live state to the
-  dashboard over a websocket.
-- **Dashboard (web)** — the strategist's live view: current position, gap to the
-  car ahead, session time remaining, stint timer with swap countdown, a fuel panel,
-  a simplified track map with car positions, and an incident log.
-- **Fuel model** — a team-wide rolling average of laps-per-tank, seeded before the
-  race and updated after every pit stop, plus manual "gauge reading" entries the
-  strategist can log while spotting the current driver to correct the estimate
-  mid-stint.
-- **Track map** — car positions plotted along a simplified track outline using
-  each car's lap-distance percentage, since iRacing doesn't expose true GPS
-  coordinates via telemetry.
+- **Collector** — runs on the Sim PC, reads iRacing's SDK shared memory (via
+  `irsdk-node`), and streams raw telemetry/session data to the agent over a
+  websocket. The only piece that has to run alongside the sim itself.
+- **Agent** — runs on the Work PC, receives the collector's stream, derives
+  stint/fuel/incident events, fetches a real track outline from iRacing's Data
+  API when available (falling back to a generic shape — see caveat below),
+  logs history to Postgres, and broadcasts live state to the dashboard.
+- **Relay** — a separate small API for the planning side: the driver roster,
+  event entry list, and special events, backed by the same Postgres database.
+  Not part of the live telemetry path.
+- **Dashboard (web)** — React + Tailwind + shadcn/ui, with a Race View section
+  (Live / Leaderboard / Car Info / Track Info) plus Drivers and Stint Planner
+  pages. Dark mode toggle in the nav bar.
+
+### Race View pages
+
+- **Live (Pit Wall)** — track map with live car positions, a Gap Board
+  (next same-class rival ahead, gap, and any different-class traffic cars in
+  between), current stint, fuel estimate, and the incident log.
+- **Leaderboard** — full running order with class-toggle chips (auto-populated
+  from the session, IMSA-scoring style), live position/interval/gap/lap times,
+  iRating, safety rating, and team name; adds a class-position column for
+  multi-class fields.
+- **Car Info** — current car's live telemetry.
+- **Track Info** — track name/length/turns/pit speed limit, session state and
+  time remaining, live weather, and a session-flag warning banner (with a
+  section-level caution strip, currently placeholder — iRacing telemetry has
+  no per-section flag data).
+
+### Fuel model
+
+A team-wide rolling average of laps-per-tank, seeded before the race and
+updated after every pit stop, plus manual "gauge reading" entries the
+strategist can log while spotting the current driver to correct the estimate
+mid-stint.
+
+### Track map caveat
+
+The real track outline comes from iRacing's Data API (`track/assets`), which
+requires an OAuth client registration. **iRacing has currently paused issuing
+new OAuth client IDs**, so until that reopens the track map falls back to a
+generic stadium-shaped outline — car positions (via `CarIdxLapDistPct`) are
+still live and accurate, just not plotted on the real track shape.
 
 ## Architecture
 
 ``` markdown
-iRacing (spectator mode)
+iRacing (spectator mode, Sim PC)
         |
         v
-Telemetry agent  --- reads shared memory, runs on the strategist's PC
+Collector  --- reads shared memory via irsdk-node, runs on the Sim PC
         |
         v  websocket
-Relay server  --- computes stats, logs to Postgres, broadcasts state
+Agent  --- derives stint/fuel/incidents, fetches track map, runs on the Work PC
         |
         v  websocket
 Dashboard  --- live view in the browser
+
+Relay  --- separate roster/entry-list/special-events API, same Postgres DB
+        ^
+        |
+Dashboard (Drivers / Stint Planner pages)
 ```
 
-Only the strategist needs anything installed or running — the rest of the team
-races normally with no extra software.
+Deployed via Docker Compose (`docker-compose.yml`) on the Work PC — relay,
+agent, dashboard, and a `cloudflared` tunnel so the rest of the team can view
+the dashboard without VPN/port-forwarding. The collector runs natively on the
+Sim PC (Windows-only, needs the native SDK addon) and isn't containerized.
 
 ## Tech stack
 
-- Agent: Python (`pyirsdk`)
-- Relay: Node.js + Express + `ws`
-- Dashboard: React + Tailwind + shadcn/ui
+- Collector: Node.js (`irsdk-node`)
+- Agent: Node.js (`ws`, `pg`)
+- Relay: Node.js + Express (roster/planning API)
+- Dashboard: React + Vite + Tailwind + shadcn/ui
 - Persistence: Postgres, hosted on [Neon](https://neon.tech) (managed, free tier) so
   drivers/stints/incidents persist across every device hitting the dashboard, not
   just the Work PC — see `INSTRUCTIONS.md`
 
-## Scope
+## Setup
 
-### v1
+Each of `agent/.env`, `relay/.env`, and the root `.env` needs a
+`DATABASE_URL` (see the respective `.env.example` files). The root `.env` is
+what Docker Compose reads for variable substitution in
+`docker-compose.yml` — `agent/.env`/`relay/.env` are for running those
+services outside Docker.
 
-- Live position, gap, session time remaining
-- Stint elapsed timer
-- Fuel: pre-race laps-per-tank estimate, live remaining-laps estimate, manual
-  gauge-reading correction
-- Simplified track map with live car markers
-- Shared incident/notes log
-
-### v2 (later)
-
-- Automated driver-swap countdown against the team's stint length rules
-- Per-stint history and a post-race review page
-- Authentication so the dashboard isn't a public URL
+For the real track map, also set `IRACING_EMAIL`/`IRACING_PASSWORD` in
+**both** `agent/.env` and the root `.env` (Compose needs its own copy) —
+though see the track map caveat above; this currently won't authenticate
+until iRacing reopens OAuth client registration.
 
 ## Status
 
-Planning stage — architecture and feature scope defined, implementation not yet
-started.
+Actively in use — collector/agent/relay/dashboard are all built and running
+against live sessions. Track map and split info are blocked on iRacing's
+paused OAuth client registration; real verification of race-only features
+(Gap Board, multi-class Leaderboard behavior) is pending the next race event.
