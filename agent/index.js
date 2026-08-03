@@ -34,6 +34,12 @@ function getOrCreateTeam(teamId) {
             lastLapsCompleted: 0,
             lastTelemetryBroadcastAt: 0,
             lastTrackMapId: null,
+            lastTrackMapPath: null,
+            lastSession: null,
+            lastTelemetry: null,
+            lastFuelEstimate: null,
+            collectorConnected: false,
+            iracingConnected: false,
         });
     }
     return teams.get(teamId);
@@ -78,6 +84,7 @@ async function handleTrackMap(teamId, trackId) {
         const svgPath = await trackMapService.getTrackPath(trackId);
         if (svgPath) {
             console.log(`Track map fetched for trackId ${trackId} (${svgPath.length} chars)`);
+            team.lastTrackMapPath = svgPath;
             dashboard.broadcast('trackmap', { trackId, path: svgPath }, teamId);
         } else {
             console.log(`No track map asset found for trackId ${trackId}`);
@@ -155,7 +162,10 @@ server.on('collector-connected', (ws) => {
 
 server.on('collector-disconnected', (ws) => {
     const connState = connections.get(ws);
-    if (connState?.teamId) dashboard.broadcast('collector', false, connState.teamId);
+    if (connState?.teamId) {
+        getOrCreateTeam(connState.teamId).collectorConnected = false;
+        dashboard.broadcast('collector', false, connState.teamId);
+    }
     connections.delete(ws);
     console.log('Collector disconnected');
 });
@@ -164,7 +174,44 @@ server.on('iracing-status', ({ connected }, ws) => {
     const connState = connections.get(ws);
     if (!connState) return;
     connState.iracingConnected = connected;
-    if (connState.teamId) dashboard.broadcast('iracingSession', connected, connState.teamId);
+    if (connState.teamId) {
+        getOrCreateTeam(connState.teamId).iracingConnected = connected;
+        dashboard.broadcast('iracingSession', connected, connState.teamId);
+    }
+});
+
+// A dashboard tab connecting now (including a refresh) missed every
+// broadcast that already happened — telemetry/session/fuel/stint only
+// ever go out when they change or on their own poll cadence, never
+// replayed — so a fresh tab would otherwise sit on "no data yet" until
+// the next natural update (which for session/fuel/stint can be seconds
+// to minutes away). Replay the last known value per team instead. This
+// is all cached state already held for other reasons (strategy engine,
+// track map dedup, etc.) — no extra telemetry reads from iRacing.
+dashboard.on('connection', (ws) => {
+    for (const [teamId, team] of teams) {
+        dashboard.sendTo(ws, 'collector', team.collectorConnected, teamId);
+        dashboard.sendTo(ws, 'iracingSession', team.iracingConnected, teamId);
+        if (team.lastSession) dashboard.sendTo(ws, 'session', team.lastSession, teamId);
+        if (team.lastTelemetry) dashboard.sendTo(ws, 'telemetry', team.lastTelemetry, teamId);
+        if (team.lastFuelEstimate) dashboard.sendTo(ws, 'fuel', team.lastFuelEstimate, teamId);
+        if (team.lastTrackMapId != null) {
+            dashboard.sendTo(
+                ws,
+                'trackmap',
+                { trackId: team.lastTrackMapId, path: team.lastTrackMapPath },
+                teamId
+            );
+        }
+        if (team.currentStintSummary) {
+            dashboard.sendTo(
+                ws,
+                'stint',
+                { ...team.currentStintSummary, lapsCompleted: team.lastLapsCompleted },
+                teamId
+            );
+        }
+    }
 });
 
 server.on('session', (data, ws) => {
@@ -175,6 +222,7 @@ server.on('session', (data, ws) => {
     if (connState.teamId) {
         const team = getOrCreateTeam(connState.teamId);
         team.strategyEngine.ingestSession(data);
+        team.lastSession = data;
         dashboard.broadcast('session', data, connState.teamId);
         handleTrackMap(connState.teamId, data?.WeekendInfo?.TrackID);
     }
@@ -198,11 +246,14 @@ server.on('telemetry', (values, ws) => {
                     connState.teamId = teamId;
                     console.log(`Resolved collector to team "${teamId}"`);
 
+                    const team = getOrCreateTeam(teamId);
+                    team.collectorConnected = true;
+                    team.iracingConnected = connState.iracingConnected;
                     dashboard.broadcast('collector', true, teamId);
                     dashboard.broadcast('iracingSession', connState.iracingConnected, teamId);
 
-                    const team = getOrCreateTeam(teamId);
                     team.strategyEngine.ingestSession(connState.latestSession);
+                    team.lastSession = connState.latestSession;
                     dashboard.broadcast('session', connState.latestSession, teamId);
                     handleTrackMap(teamId, connState.latestSession?.WeekendInfo?.TrackID);
                 })
@@ -223,6 +274,7 @@ server.on('telemetry', (values, ws) => {
     // Throttled: telemetry arrives at ~60Hz, but every dashboard tab
     // re-renders on each broadcast — nothing here needs updating faster
     // than a human can read it.
+    team.lastTelemetry = values;
     const now = Date.now();
     if (now - team.lastTelemetryBroadcastAt >= TELEMETRY_BROADCAST_INTERVAL_MS) {
         team.lastTelemetryBroadcastAt = now;
@@ -237,6 +289,7 @@ server.on('telemetry', (values, ws) => {
 
     const fuelEstimate = team.fuelCalculator.ingest(values);
     if (fuelEstimate) {
+        team.lastFuelEstimate = fuelEstimate;
         dashboard.broadcast('fuel', fuelEstimate, teamId);
         if (storage) {
             storage
