@@ -18,6 +18,15 @@ export function TrackInfoCard({
     Length,
     NumTurns,
     PitLaneSpeedLimit,
+    City,
+    State,
+    Country,
+    Altitude,
+    TrackType,
+    Direction,
+    NumPitStalls,
+    PaceSpeed,
+    DynamicTrack,
 
     SessionTimeRem,
 
@@ -84,9 +93,16 @@ export function TrackInfoCard({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
+                                Location: {City ?? '—'}{State ? `, ${State}` : ''}, {Country ?? '—'} <br />
                                 Length: {Length ?? '—'} <br />
                                 Turns: {NumTurns ?? '—'} <br />
-                                Pit Lane Speed Limit: {PitLaneSpeedLimit ?? '—'} km/h
+                                Type: {TrackType ?? '—'} <br />
+                                Direction: {Direction ?? '—'} <br />
+                                Altitude: {Altitude ?? '—'} <br />
+                                Pit Lane Speed Limit: {PitLaneSpeedLimit ?? '—'} km/h <br />
+                                Pit Stalls: {NumPitStalls ?? '—'} <br />
+                                Pace Speed: {PaceSpeed ?? '—'} <br />
+                                Dynamic Track: {DynamicTrack ?? '—'}
                             </CardContent>
                         </Card>
                         <Card>

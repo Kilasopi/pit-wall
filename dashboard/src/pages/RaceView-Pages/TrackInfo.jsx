@@ -14,6 +14,18 @@ function TrackInfo({ session, telemetry }) {
   const trackLength = session?.WeekendInfo?.TrackLengthOfficial ?? '—';
   const trackNumTurns = session?.WeekendInfo?.TrackNumTurns ?? '—';
   const trackPitLaneSpeedLimit = session?.WeekendInfo?.TrackPitLaneSpeedLimit ?? '—';
+  const trackCity = session?.WeekendInfo?.TrackCity ?? '—';
+  const trackState = session?.WeekendInfo?.TrackState ?? '';
+  const trackCountry = session?.WeekendInfo?.TrackCountry ?? '—';
+  const trackAltitude = session?.WeekendInfo?.TrackAltitude ?? '—';
+  const trackType = session?.WeekendInfo?.TrackType ?? '—';
+  const trackDirection = session?.WeekendInfo?.TrackDirection ?? '—';
+  const trackNumPitStalls = session?.WeekendInfo?.TrackNumPitStalls ?? '—';
+  const trackPaceSpeed = session?.WeekendInfo?.TrackPaceSpeed ?? '—';
+  const trackDynamicTrack =
+    session?.WeekendInfo?.TrackDynamicTrack != null
+      ? session.WeekendInfo.TrackDynamicTrack ? 'On' : 'Off'
+      : '—';
 
   // Session Info
   const sessionType = session?.SessionInfo?.SessionType ?? '—';
@@ -52,6 +64,15 @@ function TrackInfo({ session, telemetry }) {
         Length={trackLength}
         NumTurns={trackNumTurns}
         PitLaneSpeedLimit={trackPitLaneSpeedLimit}
+        City={trackCity}
+        State={trackState}
+        Country={trackCountry}
+        Altitude={trackAltitude}
+        TrackType={trackType}
+        Direction={trackDirection}
+        NumPitStalls={trackNumPitStalls}
+        PaceSpeed={trackPaceSpeed}
+        DynamicTrack={trackDynamicTrack}
 
         SessionType={sessionType}
         SessionTimeRem={sessionTimeRem}
