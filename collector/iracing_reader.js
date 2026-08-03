@@ -20,15 +20,24 @@ function flattenTelemetry(raw) {
 }
 
 class IracingReader extends EventEmitter {
-    constructor({ telemetryPollRateMs, sessionPollRateMs } = {}) {
+    constructor({ telemetryPollRateMs, telemetryFetchRateMs, sessionPollRateMs } = {}) {
         super();
         this._sdk = new IRacingSDK();
         this._telemetryPollRateMs = telemetryPollRateMs ?? Math.round(1000 / 60);
+        // How often to actually emit telemetry, independent of the SDK's own
+        // currDataVersion counter — gating on that counter meant a stall
+        // there (e.g. during a rolling-start/formation-lap transition) froze
+        // the whole telemetry stream even though the SDK was still reachable
+        // and session data kept updating. Fetching unconditionally on a
+        // timer, same as session below, means the dashboard always gets
+        // whatever the SDK currently reports rather than silently going
+        // stale on the last "changed" frame.
+        this._telemetryFetchRateMs = telemetryFetchRateMs ?? 1000;
         this._sessionPollRateMs = sessionPollRateMs ?? 1000;
 
         this._polling = false;
         this._pollTimer = null;
-        this._lastDataVersion = -1;
+        this._lastTelemetryFetchAt = 0;
         this._lastSessionFetchAt = 0;
         this._lastSessionOk = false;
     }
@@ -56,12 +65,13 @@ class IracingReader extends EventEmitter {
         }
 
         if (sessionOk && this._sdk.waitForData(this._telemetryPollRateMs)) {
-            if (this._sdk.currDataVersion !== this._lastDataVersion) {
-                this._lastDataVersion = this._sdk.currDataVersion;
+            const now = Date.now();
+
+            if (now - this._lastTelemetryFetchAt >= this._telemetryFetchRateMs) {
+                this._lastTelemetryFetchAt = now;
                 this.emit('telemetry', flattenTelemetry(this._sdk.getTelemetry()));
             }
 
-            const now = Date.now();
             if (now - this._lastSessionFetchAt >= this._sessionPollRateMs) {
                 this._lastSessionFetchAt = now;
                 this.emit('session', this._sdk.getSessionData());
