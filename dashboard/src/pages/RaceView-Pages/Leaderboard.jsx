@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Card,
   CardHeader,
@@ -19,10 +20,38 @@ import { cn } from '@/lib/utils';
 import { getSessionClasses, buildLeaderboardRows } from '@/hooks/convertLeaderboardData';
 
 function Leaderboard({ session, telemetry }) {
+  const { teamId } = useParams();
   const [inactiveClassIds, setInactiveClassIds] = useState(() => new Set());
   // Keyed by carIdx rather than driver name — carIdx is stable for the
   // session and unambiguous, whereas names could theoretically collide.
   const [highlightedCarIdxs, setHighlightedCarIdxs] = useState(() => new Set());
+
+  // Persisted per team so a refresh (or navigating away and back) doesn't
+  // lose which drivers were highlighted — reloads whenever the team
+  // changes too, so switching teams doesn't leak the previous team's
+  // highlights.
+  useEffect(() => {
+    if (!teamId) return;
+    let stored = null;
+    try {
+      stored = localStorage.getItem(`pitwall-leaderboard-highlights-${teamId}`);
+    } catch {
+      // localStorage unavailable (private browsing, etc.) — just start empty.
+    }
+    setHighlightedCarIdxs(new Set(stored ? JSON.parse(stored) : []));
+  }, [teamId]);
+
+  useEffect(() => {
+    if (!teamId) return;
+    try {
+      localStorage.setItem(
+        `pitwall-leaderboard-highlights-${teamId}`,
+        JSON.stringify([...highlightedCarIdxs])
+      );
+    } catch {
+      // localStorage unavailable — highlights just won't persist this session.
+    }
+  }, [teamId, highlightedCarIdxs]);
 
   const drivers = session?.DriverInfo?.Drivers ?? [];
   const classes = getSessionClasses(drivers);
