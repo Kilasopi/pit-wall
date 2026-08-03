@@ -9,14 +9,14 @@ import {
 } from '@/components/ui/card';
 import { classColorToCss } from '@/hooks/convertLeaderboardData';
 
-// Stadium-shaped stand-in for tracks we don't have a real outline for yet
-// (iRacing has currently paused issuing the OAuth client credentials the
-// real Data API track map needs — see agent/track_map_service.js). Not to
-// scale or shape, just something to place cars on by lap-distance percent.
+// Plain horizontal-line stand-in for tracks we don't have a real outline
+// for yet (iRacing has currently paused issuing the OAuth client
+// credentials the real Data API track map needs — see
+// agent/track_map_service.js). Not to scale or shape, just something to
+// place cars on by lap-distance percent, left-to-right for lap pct 0 → 1.
 const GENERIC_WIDTH = 1000;
-const GENERIC_HEIGHT = 400;
-const GENERIC_RADIUS = GENERIC_HEIGHT / 2;
-const GENERIC_TRACK_PATH = `M ${GENERIC_RADIUS} 0 H ${GENERIC_WIDTH - GENERIC_RADIUS} A ${GENERIC_RADIUS} ${GENERIC_RADIUS} 0 0 1 ${GENERIC_WIDTH - GENERIC_RADIUS} ${GENERIC_HEIGHT} H ${GENERIC_RADIUS} A ${GENERIC_RADIUS} ${GENERIC_RADIUS} 0 0 1 ${GENERIC_RADIUS} 0 Z`;
+const GENERIC_HEIGHT = 40;
+const GENERIC_TRACK_PATH = `M 0 ${GENERIC_HEIGHT / 2} H ${GENERIC_WIDTH}`;
 
 // Car positions are plotted by walking the track outline path with SVG's
 // getPointAtLength — same technique community iRacing overlays use, since
