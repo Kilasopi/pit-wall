@@ -10,6 +10,7 @@ const initialState = {
   incidents: [],
   telemetry: null,
   session: null,
+  trackMap: null,
 };
 
 function reducer(state, event) {
@@ -28,6 +29,8 @@ function reducer(state, event) {
       return { ...state, telemetry: event.data };
     case 'session':
       return { ...state, session: event.data };
+    case 'trackmap':
+      return { ...state, trackMap: event.data };
 
     default:
       return state;

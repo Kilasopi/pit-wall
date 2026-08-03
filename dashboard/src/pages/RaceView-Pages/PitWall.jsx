@@ -1,4 +1,6 @@
 import { Badge } from '@/components/ui/badge';
+import { TrackMapCard } from '@/components/datacards/TrackMapCard';
+import { GapBoardCard } from '@/components/datacards/GapBoardCard';
 import {
   Card,
   CardHeader,
@@ -22,9 +24,13 @@ function fuelVariant(lapsRemaining) {
   return 'default';
 }
 
-function PitWall({ stint, fuel, incidents }) {
+function PitWall({ stint, fuel, incidents, telemetry, session, trackMap }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
+      <TrackMapCard trackMap={trackMap} telemetry={telemetry} session={session} />
+
+      <GapBoardCard telemetry={telemetry} session={session} />
+
       <Card>
         <CardHeader>
           <CardTitle>Current Stint</CardTitle>

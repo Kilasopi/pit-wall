@@ -46,6 +46,8 @@ services:
       AGENT_PORT: 4100
       DASHBOARD_PORT: 4101
       DATABASE_URL: ${DATABASE_URL}
+      IRACING_EMAIL: ${IRACING_EMAIL}
+      IRACING_PASSWORD: ${IRACING_PASSWORD}
 
     develop:
       watch:

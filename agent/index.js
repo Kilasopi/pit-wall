@@ -4,17 +4,40 @@ const { DashboardServer } = require('./dashboard_server');
 const { FuelCalculator } = require('./fuel_calculator');
 const { StrategyEngine } = require('./strategy_engine');
 const { createStorage } = require('./storage');
+const { TrackMapService } = require('./track_map_service');
 
 const server = new AgentWebSocketServer(config);
 const dashboard = new DashboardServer(config);
 const fuelCalculator = new FuelCalculator();
 const strategyEngine = new StrategyEngine();
 const storage = config.databaseUrl ? createStorage(config.databaseUrl) : null;
+const trackMapService = new TrackMapService(config);
 
 let currentStintId = null;
 let lastLapsCompleted = 0;
 let lastTelemetryBroadcastAt = 0;
-const TELEMETRY_BROADCAST_INTERVAL_MS = 500;
+let lastTrackMapId = null;
+// 100ms (10Hz) — most telemetry-driven UI doesn't need this fast, but the
+// track map's car dots visibly snap between positions at anything looser.
+const TELEMETRY_BROADCAST_INTERVAL_MS = 100;
+
+async function handleTrackMap(trackId) {
+    if (trackId == null || trackId === lastTrackMapId) return;
+    lastTrackMapId = trackId;
+
+    try {
+        console.log(`Fetching track map for trackId ${trackId}...`);
+        const svgPath = await trackMapService.getTrackPath(trackId);
+        if (svgPath) {
+            console.log(`Track map fetched for trackId ${trackId} (${svgPath.length} chars)`);
+            dashboard.broadcast('trackmap', { trackId, path: svgPath });
+        } else {
+            console.log(`No track map asset found for trackId ${trackId}`);
+        }
+    } catch (err) {
+        console.error('Failed to fetch track map:', err.message);
+    }
+}
 
 async function handleSwap({ driver, carNumber, carName }) {
     if (currentStintId !== null && storage) {
@@ -54,9 +77,19 @@ async function handleIncident({ points, lap }) {
 server.on('collector-connected', () => console.log('Collector connected'));
 server.on('collector-disconnected', () => console.log('Collector disconnected'));
 
+let loggedSessionShape = false;
+
 server.on('session', (data) => {
     strategyEngine.ingestSession(data);
     dashboard.broadcast('session', data);
+
+    if (!loggedSessionShape) {
+        loggedSessionShape = true;
+        console.log('First session payload WeekendInfo keys:', Object.keys(data?.WeekendInfo ?? {}));
+        console.log('WeekendInfo.TrackID value:', data?.WeekendInfo?.TrackID);
+    }
+
+    handleTrackMap(data?.WeekendInfo?.TrackID);
 });
 
 server.on('telemetry', (values) => {

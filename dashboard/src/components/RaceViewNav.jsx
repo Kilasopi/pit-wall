@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 
 const links = [
   { to: '/', label: 'Live' },
+  { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/carinfo', label: 'Car Info' },
   { to: '/trackinfo', label: 'Track Info' },
 ];

@@ -4,6 +4,7 @@ import { NavBar } from '@/components/NavBar';
 import { RaceViewNav } from '@/components/RaceViewNav';
 import { Badge } from '@/components/ui/badge';
 import PitWall from './RaceView-Pages/PitWall.jsx';
+import Leaderboard from './RaceView-Pages/Leaderboard.jsx';
 import CarInfo from './RaceView-Pages/CarInfo.jsx';
 import TrackInfo from './RaceView-Pages/TrackInfo.jsx';
 
@@ -27,6 +28,7 @@ function RaceView() {
 
       <Routes>
         <Route index element={<PitWall {...agent} />} />
+        <Route path="leaderboard" element={<Leaderboard {...agent} />} />
         <Route path="carinfo" element={<CarInfo {...agent} />} />
         <Route path="trackinfo" element={<TrackInfo {...agent} />} />
       </Routes>
