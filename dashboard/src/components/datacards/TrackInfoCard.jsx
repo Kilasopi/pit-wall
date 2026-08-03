@@ -24,6 +24,10 @@ export function TrackInfoCard({
     sessionState,
     flagsText,
     flagsClassName,
+    rawSessionFlags,
+    sections,
+    hasSectionWarning,
+    sectionSummary,
 
     skies,
     skiesIcon: SkiesIcon,
@@ -36,34 +40,38 @@ export function TrackInfoCard({
 }) {
     return (
         <div className="space-y-4">
-            {flagsText && (
-                <div
-                    className={`w-full rounded-md px-4 py-2 text-center font-bold tracking-wide ${flagsClassName ?? 'bg-gray-500 text-white'}`}
-                >
-                    {flagsText}
-                </div>
-            )}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                    <MapPin className="size-4" />
-                        <span>{TrackName ?? "—"}</span>
-                        <span>|</span>
+                    <CardTitle className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <MapPin className="size-4" />
+                            <span>{TrackName ?? "—"}</span>
+                            <span>|</span>
 
-                        <span>
-                            {convertSessionState(sessionState) ?? "—"}
-                        </span>
+                            <span>
+                                {convertSessionState(sessionState) ?? "—"}
+                            </span>
 
-                        <span>|</span>
+                            <span>|</span>
 
-                        <span>
-                            {SessionTimeRem ?? "—"} REMAINING
-                        </span>
+                            <span>
+                                {SessionTimeRem ?? "—"} REMAINING
+                            </span>
 
-                        <span>|</span>
+                            {flagsText && (
+                                <>
+                                    <span>|</span>
+                                    <span
+                                        className={`rounded px-2 py-0.5 text-xs font-bold tracking-wide ${flagsClassName ?? 'bg-gray-500 text-white'}`}
+                                    >
+                                        {flagsText}
+                                    </span>
+                                </>
+                            )}
+                        </div>
 
                         {SkiesIcon && (
-                            <SkiesIcon className="size-5" />
+                            <SkiesIcon className="size-5 shrink-0" />
                         )}
                     </CardTitle>
                 </CardHeader>
@@ -76,8 +84,8 @@ export function TrackInfoCard({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                Length: {Length ?? '—'} |
-                                Turns: {NumTurns ?? '—'} |
+                                Length: {Length ?? '—'} <br />
+                                Turns: {NumTurns ?? '—'} <br />
                                 Pit Lane Speed Limit: {PitLaneSpeedLimit ?? '—'} km/h
                             </CardContent>
                         </Card>
@@ -100,13 +108,51 @@ export function TrackInfoCard({
                             </CardContent>
                         </Card>
                     </div>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>CAUTION STRIP</CardTitle>
+                    <Card className="overflow-hidden py-0 gap-0">
+                        <CardHeader
+                            className={`flex items-center justify-between rounded-t-xl px-2 py-2 ${
+                                hasSectionWarning
+                                    ? 'bg-yellow-400 text-black'
+                                    : (flagsClassName ?? 'bg-gray-500 text-white')
+                            }`}
+                        >
+                            <CardTitle className="flex items-center gap-1">
+                                {hasSectionWarning && <span aria-hidden="true">⚠</span>}
+                                <span>{hasSectionWarning ? 'LOCAL YELLOW' : (flagsText ?? 'TRACK CLEAR')}</span>
+                            </CardTitle>
+                            <span className="text-xs font-normal opacity-80">
+                                FLAGS: {rawSessionFlags ?? '—'}
+                            </span>
                         </CardHeader>
-                        <CardContent>
-                            TO BE MADE
+                        <CardContent className="px-2 py-2">
+                            <p className="text-sm text-muted-foreground">
+                                {hasSectionWarning ? sectionSummary : 'No active warnings'}
+                            </p>
                         </CardContent>
+                        {sections?.length > 0 && (
+                            <div
+                                className="grid border-t"
+                                style={{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }}
+                            >
+                                {sections.map((section) => (
+                                    <div
+                                        key={section.label}
+                                        className={`border-r px-2 py-2 text-center last:border-r-0 ${
+                                            section.status === 'yellow'
+                                                ? 'bg-yellow-400 text-black'
+                                                : 'bg-green-600/10 text-muted-foreground'
+                                        }`}
+                                    >
+                                        <div className="text-[10px] font-semibold tracking-wide">
+                                            {section.label}
+                                        </div>
+                                        <div className="text-xs font-bold uppercase">
+                                            {section.status}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </Card>
                 </CardContent>
             </Card>

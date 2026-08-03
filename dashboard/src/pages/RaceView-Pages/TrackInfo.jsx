@@ -2,6 +2,11 @@ import { TrackInfoCard } from '@/components/datacards/TrackInfoCard';
 import { formatTimeRemaining } from '@/hooks/convertTrackInfoData';
 import { convertSkies } from '@/hooks/convertTrackInfoData';
 import { convertSessionFlags } from '@/hooks/convertTrackInfoData';
+import { convertSectionFlags } from '@/hooks/convertTrackInfoData';
+
+// Placeholder until a real per-section yellow source (spotter input, corner
+// worker data, etc.) exists — iRacing telemetry has no such field.
+const TRACK_SECTION_COUNT = 5;
 
 function TrackInfo({ session, telemetry }) {
   // Track Info
@@ -17,8 +22,12 @@ function TrackInfo({ session, telemetry }) {
 
   // Flags
   const { text: flagsText, className: flagsClassName } = convertSessionFlags(telemetry?.SessionFlags);
+  const rawSessionFlags = telemetry?.SessionFlags ?? '—';
   const sessionState = telemetry?.SessionState ?? '—';
   const pitsOpen = telemetry?.PitsOpen ?? '—';
+  const { sections, hasWarning, summary } = convertSectionFlags(
+    telemetry?.SectionFlags ?? new Array(TRACK_SECTION_COUNT).fill(false)
+  );
 
   // Track Weather
   const { Label: skies, Icon: SkiesIcon } = convertSkies(telemetry?.Skies);
@@ -50,8 +59,12 @@ function TrackInfo({ session, telemetry }) {
 
         flagsText={flagsText}
         flagsClassName={flagsClassName}
+        rawSessionFlags={rawSessionFlags}
         sessionState={sessionState}
         pitsOpen={pitsOpen}
+        sections={sections}
+        hasSectionWarning={hasWarning}
+        sectionSummary={summary}
 
         skies={skies}
         skiesIcon={SkiesIcon}

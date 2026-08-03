@@ -170,6 +170,30 @@ export function convertSessionFlags(flags) {
     };
 }
 
+// No iRacing telemetry field reports which track section a local yellow is
+// in — SessionFlags is a single global bitmask. This builds a per-section
+// display from a `sectionFlags` array of booleans (true = yellow) so the UI
+// is ready to plug into a real source (spotter input, corner-worker data,
+// etc.) once one exists; until then callers can pass an all-clear array.
+export function convertSectionFlags(sectionFlags) {
+    const sections = (sectionFlags ?? []).map((isYellow, index) => ({
+        label: `SECTION ${index + 1}`,
+        status: isYellow ? 'yellow' : 'clear',
+    }));
+
+    const yellowSections = sections.filter((s) => s.status === 'yellow');
+
+    const summary = yellowSections.length === 0
+        ? 'No active warnings'
+        : `Yellow detected in ${yellowSections.map((s) => s.label[0] + s.label.slice(1).toLowerCase()).join(', ')}`;
+
+    return {
+        sections,
+        hasWarning: yellowSections.length > 0,
+        summary,
+    };
+}
+
 export function formatTimeRemaining(totalSeconds) {
     if (
         totalSeconds == null ||
