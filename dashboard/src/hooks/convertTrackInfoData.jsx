@@ -182,7 +182,7 @@ const LOCAL_YELLOW_HOLD_MS = 3000;
 // field for which section a local yellow is in — this infers it from
 // whichever cars currently carry a local-yellow CarIdxSessionFlags bit and
 // where their CarIdxLapDistPct falls within those boundaries.
-function getSectionBoundaries(session) {
+export function getSectionBoundaries(session) {
     const sectors = session?.SplitTimeInfo?.Sectors;
     if (!Array.isArray(sectors) || sectors.length === 0) return [0];
     return sectors.map((sector) => sector?.SectorStartPct ?? 0);
