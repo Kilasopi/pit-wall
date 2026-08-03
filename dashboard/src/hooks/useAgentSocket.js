@@ -8,6 +8,7 @@ const initialState = {
   stint: null,
   fuel: null,
   incidents: [],
+  telemetry: null,
 };
 
 function reducer(state, event) {
@@ -22,6 +23,8 @@ function reducer(state, event) {
       return { ...state, fuel: event.data };
     case 'incident':
       return { ...state, incidents: [event.data, ...state.incidents] };
+    case 'telemetry':
+      return { ...state, telemetry: event.data };
     default:
       return state;
   }

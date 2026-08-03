@@ -2,12 +2,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const links = [
-  { to: '/', label: 'Race View' },
-  { to: '/drivers', label: 'Drivers' },
-  { to: '/planner', label: 'Stint Planner' },
+  { to: '/', label: 'Live' },
+  { to: '/carinfo', label: 'Car Info' },
+  { to: '/trackinfo', label: 'Track Info' },
 ];
 
-export function NavBar() {
+export function RaceViewNav() {
   const { pathname } = useLocation();
 
   return (

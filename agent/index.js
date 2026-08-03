@@ -14,6 +14,8 @@ const storage = config.databaseUrl ? createStorage(config.databaseUrl) : null;
 
 let currentStintId = null;
 let lastLapsCompleted = 0;
+let lastTelemetryBroadcastAt = 0;
+const TELEMETRY_BROADCAST_INTERVAL_MS = 500;
 
 async function handleSwap({ driver, carNumber, carName }) {
     if (currentStintId !== null && storage) {
@@ -64,7 +66,14 @@ server.on('telemetry', (values) => {
     // Raw feed, broadcast as-is alongside the derived stint/fuel/incident
     // messages — a hook for building new functionality against the full
     // telemetry stream without touching strategy_engine/fuel_calculator.
-    dashboard.broadcast('telemetry', values);
+    // Throttled: telemetry arrives at ~60Hz, but every dashboard tab
+    // re-renders on each broadcast — nothing here needs updating faster
+    // than a human can read it.
+    const now = Date.now();
+    if (now - lastTelemetryBroadcastAt >= TELEMETRY_BROADCAST_INTERVAL_MS) {
+        lastTelemetryBroadcastAt = now;
+        dashboard.broadcast('telemetry', values);
+    }
 
     for (const event of strategyEngine.ingestTelemetry(values)) {
         if (event.type === 'swap') handleSwap(event).catch(console.error);
