@@ -62,6 +62,7 @@ services:
             - __pycache__/
             - "*.pyc"
             - Dockerfile
+            - tmp-telemetry-dump/
 
   dashboard:
     build: ./dashboard
