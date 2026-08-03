@@ -96,23 +96,42 @@ export function buildLeaderboardRows(drivers, telemetry) {
 
   // Interval = this car's gap to leader minus the car ahead's gap to
   // leader — iRacing doesn't broadcast a direct car-to-car interval field.
-  const leaderLap = rows[0]?.lap ?? 0;
+  // Interval stays relative to the overall running order (the car
+  // physically ahead may be a different class), but a class leader has
+  // nothing meaningful to show an interval against — they're already at
+  // the front of their own class regardless of who's ahead overall.
+  //
+  // Gap, on the other hand, is relative to each row's own class leader,
+  // not the overall race leader — a P2-in-class row should show how far
+  // behind ITS class leader it is, not the overall leader's gap.
+  const classLeaderByClassId = new Map();
+  for (const row of rows) {
+    if (row.classPosition === 1 && !classLeaderByClassId.has(row.classId)) {
+      classLeaderByClassId.set(row.classId, row);
+    }
+  }
 
   return rows.map((row, i) => {
     const isLeader = row.position === 1;
+    const isClassLeader = row.classPosition === 1;
     const carAhead = rows[i - 1];
     const interval =
       !isLeader && carAhead && row.gapToLeaderSeconds != null && carAhead.gapToLeaderSeconds != null
         ? row.gapToLeaderSeconds - carAhead.gapToLeaderSeconds
         : null;
-
-    const lapsDown = lapsBehind(leaderLap, row.lap);
     const lapsBehindCarAhead = carAhead ? lapsBehind(carAhead.lap, row.lap) : 0;
+
+    const classLeader = classLeaderByClassId.get(row.classId);
+    const gapToClassLeaderSeconds =
+      !isClassLeader && classLeader && row.gapToLeaderSeconds != null && classLeader.gapToLeaderSeconds != null
+        ? row.gapToLeaderSeconds - classLeader.gapToLeaderSeconds
+        : null;
+    const lapsDownInClass = classLeader ? lapsBehind(classLeader.lap, row.lap) : 0;
 
     return {
       ...row,
-      gapToLeader: formatGapOrLaps(row.gapToLeaderSeconds, isLeader, lapsDown),
-      interval: isLeader ? '—' : formatGapOrLaps(interval, false, lapsBehindCarAhead),
+      gapToLeader: formatGapOrLaps(gapToClassLeaderSeconds, isClassLeader, lapsDownInClass),
+      interval: isClassLeader ? '—' : formatGapOrLaps(interval, false, lapsBehindCarAhead),
     };
   });
 }
