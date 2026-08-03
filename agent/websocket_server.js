@@ -1,6 +1,9 @@
-// WebSocket server that accepts collector connection(s) from the Sim PC
-// and emits parsed telemetry/session events for downstream consumers
-// (fuel_calculator, strategy_engine, storage, dashboard broadcast).
+// WebSocket server that accepts collector connection(s) from any number of
+// Sim PCs and emits parsed telemetry/session events for downstream
+// consumers (fuel_calculator, strategy_engine, storage, dashboard
+// broadcast). Each connection is passed through as `ws` on every event so
+// callers can track per-collector state — nothing here knows which team a
+// connection belongs to, that's resolved downstream from car number.
 const { EventEmitter } = require('events');
 const { WebSocketServer } = require('ws');
 const { createMessage, parseMessage, MESSAGE_TYPES } = require('../shared/telemetry_schema');
@@ -16,7 +19,7 @@ class AgentWebSocketServer extends EventEmitter {
         this._wss = new WebSocketServer({ port: this._port });
 
         this._wss.on('connection', (ws) => {
-            this.emit('collector-connected');
+            this.emit('collector-connected', ws);
 
             ws.on('message', (raw) => {
                 let message;
@@ -27,14 +30,14 @@ class AgentWebSocketServer extends EventEmitter {
                 }
 
                 if (message.type === MESSAGE_TYPES.TELEMETRY) {
-                    this.emit('telemetry', message.payload);
+                    this.emit('telemetry', message.payload, ws);
                 } else if (message.type === MESSAGE_TYPES.SESSION) {
-                    this.emit('session', message.payload);
+                    this.emit('session', message.payload, ws);
                 }
             });
 
             ws.on('close', () => {
-                this.emit('collector-disconnected');
+                this.emit('collector-disconnected', ws);
             });
         });
     }

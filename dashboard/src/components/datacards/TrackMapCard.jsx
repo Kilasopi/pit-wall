@@ -7,6 +7,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card';
+import { classColorToCss } from '@/hooks/convertLeaderboardData';
 
 // Stadium-shaped stand-in for tracks we don't have a real outline for yet
 // (iRacing has currently paused issuing the OAuth client credentials the
@@ -46,7 +47,13 @@ export function TrackMapCard({ trackMap, telemetry, session }) {
       const idx = driver.CarIdx;
       const pct = Array.isArray(lapDistPct) ? lapDistPct[idx] : undefined;
       const surface = Array.isArray(trackSurface) ? trackSurface[idx] : undefined;
-      return { idx, driver, pct, onTrack: surface != null && surface !== -1 };
+      return {
+        idx,
+        driver,
+        pct,
+        onTrack: surface != null && surface !== -1,
+        classColor: classColorToCss(driver.CarClassColor),
+      };
     })
     .filter((car) => car.onTrack && car.pct != null && car.pct >= 0);
 
@@ -97,13 +104,12 @@ export function TrackMapCard({ trackMap, telemetry, session }) {
               cx={car.x}
               cy={car.y}
               r={car.idx === playerCarIdx ? carRadius * 1.3 : carRadius}
-              strokeWidth={strokeWidth * 0.2}
-              style={{ transition: 'cx 0.1s linear, cy 0.1s linear' }}
-              className={
-                car.idx === playerCarIdx
-                  ? 'fill-primary stroke-primary-foreground'
-                  : 'fill-secondary stroke-secondary-foreground'
-              }
+              strokeWidth={car.idx === playerCarIdx ? strokeWidth * 0.4 : strokeWidth * 0.2}
+              style={{
+                fill: car.classColor,
+                stroke: car.idx === playerCarIdx ? 'white' : 'black',
+                transition: 'cx 0.1s linear, cy 0.1s linear',
+              }}
             />
           ))}
         </svg>

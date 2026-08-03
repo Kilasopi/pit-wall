@@ -1,6 +1,6 @@
 // Postgres access for stint/fuel/incident history. Same schema relay
 // already uses (db/schema.sql) — this only touches the stints,
-// fuel_readings, incidents, and murder_drivers tables.
+// fuel_readings, incidents, murder_drivers, and entry_drivers tables.
 const { Pool } = require('pg');
 
 function createStorage(databaseUrl) {
@@ -25,12 +25,25 @@ function createStorage(databaseUrl) {
             return driver.nickname || driver.name;
         },
 
-        async openStint({ driver, carNumber, startedAt }) {
+        // Resolves which roster entry a car number belongs to, so the
+        // agent can auto-detect team identity instead of needing per-Sim-PC
+        // config. Multiple driver rows can share an entry_name/car_number;
+        // any match is enough.
+        async findEntryNameByCarNumber(carNumber) {
+            if (!carNumber) return null;
             const { rows } = await pool.query(
-                `INSERT INTO stints (driver, car_number, started_at, laps_completed)
-                 VALUES ($1, $2, $3, 0)
+                'SELECT entry_name FROM entry_drivers WHERE car_number = $1 LIMIT 1',
+                [String(carNumber)]
+            );
+            return rows[0]?.entry_name ?? null;
+        },
+
+        async openStint({ driver, carNumber, entryName, startedAt }) {
+            const { rows } = await pool.query(
+                `INSERT INTO stints (driver, car_number, entry_name, started_at, laps_completed)
+                 VALUES ($1, $2, $3, $4, 0)
                  RETURNING id`,
-                [driver, carNumber ?? null, startedAt]
+                [driver, carNumber ?? null, entryName ?? null, startedAt]
             );
             return rows[0].id;
         },
@@ -51,20 +64,20 @@ function createStorage(databaseUrl) {
             ]);
         },
 
-        async insertFuelReading({ stintId, lapsRemainingEst, source }) {
+        async insertFuelReading({ stintId, entryName, lapsRemainingEst, source }) {
             await pool.query(
-                `INSERT INTO fuel_readings (stint_id, laps_remaining_est, source)
-                 VALUES ($1, $2, $3)`,
-                [stintId ?? null, lapsRemainingEst, source]
+                `INSERT INTO fuel_readings (stint_id, entry_name, laps_remaining_est, source)
+                 VALUES ($1, $2, $3, $4)`,
+                [stintId ?? null, entryName ?? null, lapsRemainingEst, source]
             );
         },
 
-        async insertIncident({ lap, description, points }) {
+        async insertIncident({ entryName, lap, description, points }) {
             const { rows } = await pool.query(
-                `INSERT INTO incidents (lap, description, points)
-                 VALUES ($1, $2, $3)
+                `INSERT INTO incidents (entry_name, lap, description, points)
+                 VALUES ($1, $2, $3, $4)
                  RETURNING id, logged_at`,
-                [lap ?? null, description, points]
+                [entryName ?? null, lap ?? null, description, points]
             );
             return rows[0];
         },

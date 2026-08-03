@@ -180,6 +180,35 @@ function RosterDriversCard() {
   );
 }
 
+function CarNumberCell({ row }) {
+  const [value, setValue] = useState(row.car_number ?? '');
+  const [saving, setSaving] = useState(false);
+
+  function save() {
+    const trimmed = value.trim();
+    if (trimmed === (row.car_number ?? '')) return;
+    setSaving(true);
+    fetch(`${RELAY_HTTP_URL}/api/entry-drivers/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ carNumber: trimmed || null }),
+    })
+      .catch(() => alert('Failed to update car number'))
+      .finally(() => setSaving(false));
+  }
+
+  return (
+    <input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      disabled={saving}
+      placeholder="—"
+      className="w-16 rounded border border-input bg-transparent px-1.5 py-0.5 text-sm"
+    />
+  );
+}
+
 function EntryDriversCard() {
   const [showForm, setShowForm] = useState(false);
 
@@ -203,6 +232,7 @@ function EntryDriversCard() {
           { key: 'driver_name', label: 'Name' },
           { key: 'event_name', label: 'Event' },
           { key: 'entry_name', label: 'Entry' },
+          { key: 'car_number', label: 'Car #', render: (r) => <CarNumberCell row={r} /> },
           { key: 'car_type', label: 'Car Type', render: (r) => r.car_type ?? '—' },
           {
             key: 'is_guest',

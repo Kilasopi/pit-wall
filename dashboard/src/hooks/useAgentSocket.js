@@ -16,6 +16,8 @@ const initialState = {
 
 function reducer(state, event) {
   switch (event.type) {
+    case 'reset':
+      return { ...initialState, connected: state.connected };
     case 'connected':
       return { ...state, connected: true };
     case 'disconnected':
@@ -41,12 +43,20 @@ function reducer(state, event) {
 }
 
 // Live stint/fuel/incident state broadcast by agent/dashboard_server.js.
-// Same message shape as useRelaySocket, which this replaces for the
-// dashboard's live-telemetry view (relay still serves roster/planning data).
-export function useAgentSocket() {
+// The agent multiplexes every connected team's data over one socket
+// (tagged { type, team, data }), so this only applies messages for the
+// team it was asked to watch — resetting to a clean slate whenever teamId
+// changes, since none of the previous team's state is valid for a new one.
+export function useAgentSocket(teamId) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
+  const teamIdRef = useRef(teamId);
+  teamIdRef.current = teamId;
+
+  useEffect(() => {
+    dispatchRef.current({ type: 'reset' });
+  }, [teamId]);
 
   useEffect(() => {
     let ws;
@@ -65,7 +75,11 @@ export function useAgentSocket() {
         } catch {
           return;
         }
-        if (msg?.type) dispatchRef.current(msg);
+        if (!msg?.type) return;
+        // team === null is a connection-status event, not team data —
+        // those apply regardless of which team is being watched.
+        if (msg.team != null && msg.team !== teamIdRef.current) return;
+        dispatchRef.current(msg);
       };
 
       ws.onclose = () => {

@@ -28,6 +28,7 @@ export function AddEntryDriverForm({ onAdded }) {
   const [eventChoice, setEventChoice] = useState('');
   const [customEventName, setCustomEventName] = useState('');
   const [entryName, setEntryName] = useState('');
+  const [carNumber, setCarNumber] = useState('');
   const [carType, setCarType] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -64,6 +65,7 @@ export function AddEntryDriverForm({ onAdded }) {
     const shared = {
       eventName,
       entryName: entryName.trim(),
+      carNumber: carNumber.trim() || null,
       carType: carType || null,
     };
 
@@ -180,6 +182,20 @@ export function AddEntryDriverForm({ onAdded }) {
               onChange={(e) => setEntryName(e.target.value)}
               placeholder="e.g. MURDER1"
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="carNumber">Car #</Label>
+            <Input
+              id="carNumber"
+              value={carNumber}
+              onChange={(e) => setCarNumber(e.target.value)}
+              placeholder="e.g. 47"
+            />
+            <p className="text-xs text-muted-foreground">
+              Must match the car number in-sim — the pit wall dashboard uses this to tell
+              entries apart automatically.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">

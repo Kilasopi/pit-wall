@@ -1,7 +1,11 @@
+-- entry_name ties a row to one entry_drivers.entry_name (e.g.
+-- "MURDER-Test") so multiple concurrent entries don't share history. The
+-- agent resolves it from car number, not any manual per-machine config.
 CREATE TABLE stints (
     id SERIAL PRIMARY KEY,
     driver TEXT NOT NULL,
     car_number TEXT,
+    entry_name TEXT,
     started_at TIMESTAMPTZ NOT NULL,
     ended_at TIMESTAMPTZ,
     laps_completed INT DEFAULT 0,
@@ -11,6 +15,7 @@ CREATE TABLE stints (
 CREATE TABLE incidents (
     id SERIAL PRIMARY KEY,
     logged_at TIMESTAMPTZ DEFAULT now(),
+    entry_name TEXT,
     lap INT,
     description TEXT NOT NULL,
     -- iRacing incident points for this single incident: 0x/1x/2x/4x.
@@ -20,6 +25,7 @@ CREATE TABLE incidents (
 CREATE TABLE fuel_readings (
     id SERIAL PRIMARY KEY,
     stint_id INT REFERENCES stints(id),
+    entry_name TEXT,
     logged_at TIMESTAMPTZ DEFAULT now(),
     laps_remaining_est NUMERIC,
     source TEXT

@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useParams, Navigate } from 'react-router-dom';
 import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { NavBar } from '@/components/NavBar';
 import { RaceViewNav } from '@/components/RaceViewNav';
@@ -14,19 +14,22 @@ import Strategy from './RaceView-Pages/Strategy.jsx';
 // Wall/Car Info/Track Info all read it via props instead of each calling
 // useAgentSocket() themselves, which would open a separate socket per page.
 function RaceView() {
-  const agent = useAgentSocket();
+  const { teamId } = useParams();
+  const agent = useAgentSocket(teamId);
+
+  if (!teamId) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen bg-background p-6 text-foreground">
       <div className="mb-2 flex items-center justify-between">
-        <h1 className="text-xl font-heading font-medium">Pit Wall</h1>
+        <h1 className="text-xl font-heading font-medium">Pit Wall — {teamId}</h1>
         <Badge variant={agent.connected ? 'default' : 'destructive'}>
           {agent.connected ? 'Connected' : 'Disconnected'}
         </Badge>
       </div>
 
       <NavBar />
-      <RaceViewNav />
+      <RaceViewNav teamId={teamId} />
       <ThresholdAlertBanner fuel={agent.fuel} />
 
       <Routes>
