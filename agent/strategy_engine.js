@@ -11,6 +11,34 @@
 //   total for the session; a positive delta *is* the points value for
 //   that incident (1x/2x/4x). A 0x/warning-only incident doesn't move
 //   this counter, so it can't be detected this way.
+// The "dc*" (driver control) telemetry vars a driver can adjust mid-stint —
+// kept in sync with dashboard/src/components/datacards/AdjustmentsCard.jsx's
+// ADJUSTMENTS list, since that's the other place this same set of fields
+// needs to be named.
+const DC_SETTINGS_FIELDS = [
+    'dcBrakeBias',
+    'dcTractionControl',
+    'dcTractionControl2',
+    'dcABS',
+    'dcEngineBraking',
+    'dcThrottleShape',
+    'dcFuelMixture',
+    'dcDiffEntry',
+    'dcDiffMiddle',
+    'dcDiffExit',
+    'dcAntiRollFront',
+    'dcAntiRollRear',
+    'dcWeightJackerLeft',
+];
+
+function extractDcSettings(values) {
+    const settings = {};
+    for (const key of DC_SETTINGS_FIELDS) {
+        if (typeof values[key] === 'number') settings[key] = values[key];
+    }
+    return settings;
+}
+
 class StrategyEngine {
     constructor() {
         this._sessionInfo = null;
@@ -22,6 +50,7 @@ class StrategyEngine {
         this._currentDriver = null;
         this._currentCarNumber = null;
         this._currentCarName = null;
+        this._lastSettings = null;
     }
 
     ingestSession(sessionInfo) {
@@ -29,7 +58,7 @@ class StrategyEngine {
     }
 
     // Returns an array of events for this telemetry tick, any of:
-    //   { type: 'swap', driver, carNumber, carName, lap }
+    //   { type: 'swap', driver, carNumber, carName, lap, previousSettings }
     //   { type: 'lap', lapsCompletedThisStint }
     //   { type: 'incident', points, lap }
     ingestTelemetry(values) {
@@ -59,8 +88,14 @@ class StrategyEngine {
             this._currentCarNumber = carNumber;
             this._currentCarName = carName;
             this._lapAtStintStart = lap ?? 0;
-            events.push({ type: 'swap', driver, carNumber, carName, lap });
+            // this._lastSettings is whatever was last recorded for the
+            // outgoing driver's stint (previous tick, before this swap) —
+            // the incoming driver's own settings get recorded below as
+            // this tick's values overwrite it for next time.
+            events.push({ type: 'swap', driver, carNumber, carName, lap, previousSettings: this._lastSettings });
         }
+
+        this._lastSettings = extractDcSettings(values);
 
         if (lap !== null && lap !== this._lastLap) {
             this._lastLap = lap;

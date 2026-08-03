@@ -2,8 +2,9 @@ import { FuelCard } from '@/components/datacards/FuelCard';
 import { TireWearCard } from '@/components/datacards/TireWearCard';
 import { AdjustmentsCard } from '@/components/datacards/AdjustmentsCard';
 import { BatteryCard } from '@/components/datacards/BatteryCard';
+import { PreviousDriverSettingsCard } from '@/components/datacards/PreviousDriverSettingsCard';
 
-function CarInfo({ telemetry }) {
+function CarInfo({ telemetry, stintHistory }) {
   // FuelLevelPct is 0-1 straight from the SDK; FuelCard wants 0-100.
   // FuelLevel is already in litres, no conversion needed.
   const percentage = telemetry?.FuelLevelPct != null ? telemetry.FuelLevelPct * 100 : 0;
@@ -31,7 +32,10 @@ function CarInfo({ telemetry }) {
           rearRight={rearRight}
         />
       </div>
-      <AdjustmentsCard telemetry={telemetry} />
+      <div className="flex flex-wrap gap-4">
+        <AdjustmentsCard telemetry={telemetry} />
+        <PreviousDriverSettingsCard stintHistory={stintHistory} />
+      </div>
     </div>
   );
 }

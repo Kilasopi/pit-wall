@@ -12,7 +12,7 @@ import {
 // oval car has no brake bias in some series, etc.), so each row only shows
 // up when iRacing actually reports a value for it, rather than padding the
 // card out with dashes for systems the current car doesn't have.
-const ADJUSTMENTS = [
+export const ADJUSTMENTS = [
   { key: 'dcBrakeBias', label: 'Brake Bias', format: (v) => v.toFixed(1) },
   { key: 'dcTractionControl', label: 'Traction Control', format: (v) => v.toFixed(0) },
   { key: 'dcTractionControl2', label: 'Traction Control 2', format: (v) => v.toFixed(0) },

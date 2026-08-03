@@ -9,7 +9,11 @@ CREATE TABLE stints (
     started_at TIMESTAMPTZ NOT NULL,
     ended_at TIMESTAMPTZ,
     laps_completed INT DEFAULT 0,
-    fuel_used_est NUMERIC
+    fuel_used_est NUMERIC,
+    -- The outgoing driver's dc* (driver control) settings as of their last
+    -- telemetry tick, so the next driver can see what was dialed in before
+    -- the swap. Null until the stint closes.
+    settings_snapshot JSONB
 );
 
 CREATE TABLE incidents (

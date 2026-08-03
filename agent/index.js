@@ -87,13 +87,18 @@ async function handleTrackMap(teamId, trackId) {
     }
 }
 
-async function handleSwap(teamId, team, { driver, carNumber, carName }) {
+async function handleSwap(teamId, team, { driver, carNumber, carName, previousSettings }) {
     const endedAt = new Date();
 
     if (team.currentStintSummary) {
         dashboard.broadcast(
             'stintClosed',
-            { ...team.currentStintSummary, endedAt, lapsCompleted: team.lastLapsCompleted },
+            {
+                ...team.currentStintSummary,
+                endedAt,
+                lapsCompleted: team.lastLapsCompleted,
+                settings: previousSettings ?? null,
+            },
             teamId
         );
     }
@@ -102,6 +107,7 @@ async function handleSwap(teamId, team, { driver, carNumber, carName }) {
         await storage.closeStint(team.currentStintId, {
             endedAt,
             lapsCompleted: team.lastLapsCompleted,
+            settingsSnapshot: previousSettings ?? null,
         });
     }
 

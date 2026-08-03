@@ -48,12 +48,18 @@ function createStorage(databaseUrl) {
             return rows[0].id;
         },
 
-        async closeStint(stintId, { endedAt, lapsCompleted, fuelUsedEst }) {
+        async closeStint(stintId, { endedAt, lapsCompleted, fuelUsedEst, settingsSnapshot }) {
             await pool.query(
                 `UPDATE stints
-                 SET ended_at = $1, laps_completed = $2, fuel_used_est = $3
-                 WHERE id = $4`,
-                [endedAt, lapsCompleted ?? null, fuelUsedEst ?? null, stintId]
+                 SET ended_at = $1, laps_completed = $2, fuel_used_est = $3, settings_snapshot = $4
+                 WHERE id = $5`,
+                [
+                    endedAt,
+                    lapsCompleted ?? null,
+                    fuelUsedEst ?? null,
+                    settingsSnapshot ? JSON.stringify(settingsSnapshot) : null,
+                    stintId,
+                ]
             );
         },
 
