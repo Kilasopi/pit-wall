@@ -143,13 +143,22 @@ async function handleIncident(teamId, { points, lap }) {
 }
 
 server.on('collector-connected', (ws) => {
-    connections.set(ws, { teamId: null, latestSession: null, resolving: false });
+    connections.set(ws, { teamId: null, latestSession: null, resolving: false, iracingConnected: false });
     console.log('Collector connected');
 });
 
 server.on('collector-disconnected', (ws) => {
+    const connState = connections.get(ws);
+    if (connState?.teamId) dashboard.broadcast('collector', false, connState.teamId);
     connections.delete(ws);
     console.log('Collector disconnected');
+});
+
+server.on('iracing-status', ({ connected }, ws) => {
+    const connState = connections.get(ws);
+    if (!connState) return;
+    connState.iracingConnected = connected;
+    if (connState.teamId) dashboard.broadcast('iracingSession', connected, connState.teamId);
 });
 
 server.on('session', (data, ws) => {
@@ -182,6 +191,9 @@ server.on('telemetry', (values, ws) => {
 
                     connState.teamId = teamId;
                     console.log(`Resolved collector to team "${teamId}"`);
+
+                    dashboard.broadcast('collector', true, teamId);
+                    dashboard.broadcast('iracingSession', connState.iracingConnected, teamId);
 
                     const team = getOrCreateTeam(teamId);
                     team.strategyEngine.ingestSession(connState.latestSession);

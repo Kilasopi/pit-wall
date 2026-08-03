@@ -52,6 +52,10 @@ class TelemetrySender extends EventEmitter {
         this._send(createMessage(MESSAGE_TYPES.SESSION, data));
     }
 
+    sendIracingStatus(connected) {
+        this._send(createMessage(MESSAGE_TYPES.IRACING_STATUS, { connected }));
+    }
+
     _send(message) {
         if (this._ws && this._ws.readyState === WebSocket.OPEN) {
             this._ws.send(JSON.stringify(message));

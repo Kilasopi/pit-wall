@@ -12,6 +12,8 @@ const initialState = {
   telemetry: null,
   session: null,
   trackMap: null,
+  collectorConnected: false,
+  inIracingSession: false,
 };
 
 function reducer(state, event) {
@@ -36,6 +38,10 @@ function reducer(state, event) {
       return { ...state, session: event.data };
     case 'trackmap':
       return { ...state, trackMap: event.data };
+    case 'collector':
+      return { ...state, collectorConnected: event.data };
+    case 'iracingSession':
+      return { ...state, inIracingSession: event.data };
 
     default:
       return state;

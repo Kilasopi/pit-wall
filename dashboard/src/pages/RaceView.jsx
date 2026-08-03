@@ -3,7 +3,6 @@ import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { NavBar } from '@/components/NavBar';
 import { RaceViewNav } from '@/components/RaceViewNav';
 import { ThresholdAlertBanner } from '@/components/ThresholdAlertBanner';
-import { Badge } from '@/components/ui/badge';
 import PitWall from './RaceView-Pages/PitWall.jsx';
 import Leaderboard from './RaceView-Pages/Leaderboard.jsx';
 import CarInfo from './RaceView-Pages/CarInfo.jsx';
@@ -23,9 +22,6 @@ function RaceView() {
     <div className="min-h-screen bg-background p-6 text-foreground">
       <div className="mb-2 flex items-center justify-between">
         <h1 className="text-xl font-heading font-medium">Pit Wall — {teamId}</h1>
-        <Badge variant={agent.connected ? 'default' : 'destructive'}>
-          {agent.connected ? 'Connected' : 'Disconnected'}
-        </Badge>
       </div>
 
       <NavBar />

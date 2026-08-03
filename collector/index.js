@@ -14,8 +14,14 @@ attachCommandReceiver(sender, (command) => {
     console.log('Received command from agent:', command);
 });
 
-reader.on('connected', () => console.log('Connected to iRacing'));
-reader.on('disconnected', () => console.log('Waiting for iRacing session...'));
+reader.on('connected', () => {
+    console.log('Connected to iRacing');
+    sender.sendIracingStatus(true);
+});
+reader.on('disconnected', () => {
+    console.log('Waiting for iRacing session...');
+    sender.sendIracingStatus(false);
+});
 reader.on('telemetry', (values) => sender.sendTelemetry(values));
 reader.on('session', (data) => sender.sendSession(data));
 

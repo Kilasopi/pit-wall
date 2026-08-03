@@ -4,6 +4,7 @@ const MESSAGE_TYPES = {
     TELEMETRY: 'telemetry',
     SESSION: 'session',
     COMMAND: 'command',
+    IRACING_STATUS: 'iracingStatus',
 };
 
 function createMessage(type, payload) {
