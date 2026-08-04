@@ -57,6 +57,11 @@ const wss = new WebSocketServer({ server });
 let latestState = null;
 
 wss.on('connection', (ws) => {
+    // Without this, a client connecting after the last publish sits blank
+    // until the next one arrives — which can be minutes away for state that
+    // only changes on stint/fuel/incident events rather than a fast tick.
+    if (latestState) ws.send(JSON.stringify(latestState));
+
     ws.on('message', (raw) => {
         const msg = JSON.parse(raw);
         latestState = msg;
