@@ -6,8 +6,17 @@ const { attachCommandReceiver } = require('./command_receiver');
 const reader = new IracingReader(config);
 const sender = new TelemetrySender(config);
 
+// The very first iRacing status can be known before the agent socket
+// finishes connecting (e.g. iRacing is already running when the collector
+// restarts), and TelemetrySender.send() silently drops anything sent while
+// the socket isn't OPEN yet — with no queue or resend. Track the latest
+// known status here and resend it whenever the agent connection (re)opens
+// so it can't be lost to that race.
+let iracingConnected = false;
+
 sender.on('connected', () => {
     console.log(`Connected to agent at ${config.agentUrl}`);
+    sender.sendIracingStatus(iracingConnected);
     if (config.teamOverride) {
         console.log(`Pinning this connection to team "${config.teamOverride}"`);
         sender.sendHello(config.teamOverride);
@@ -22,10 +31,12 @@ attachCommandReceiver(sender, (command) => {
 
 reader.on('connected', () => {
     console.log('Connected to iRacing');
+    iracingConnected = true;
     sender.sendIracingStatus(true);
 });
 reader.on('disconnected', () => {
     console.log('Waiting for iRacing session...');
+    iracingConnected = false;
     sender.sendIracingStatus(false);
 });
 reader.on('telemetry', (values) => sender.sendTelemetry(values));
