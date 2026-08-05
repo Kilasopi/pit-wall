@@ -5,43 +5,59 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
-function TireGauge({ label, percentage }) {
-  const wear = Math.min(100, Math.max(0, percentage ?? 0))
+// wear is the SDK's fraction of tread remaining (0-1); temp is already in
+// the SDK's native °F.
+function TireSection({ label, wear, temp }) {
+  const remaining = wear != null ? Math.min(100, Math.max(0, wear * 100)) : null
 
   return (
-    <Card className="w-20 overflow-hidden">
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <div className="relative h-20 w-6 overflow-hidden rounded-md border bg-muted">
+        <div
+          className="absolute inset-x-0 bottom-0 bg-blue-500 transition-[height] duration-500 ease-out"
+          style={{ height: `${remaining ?? 0}%` }}
+        />
+      </div>
+      <span className="text-xs font-bold">{remaining != null ? `${Math.round(remaining)}%` : '—'}</span>
+      <span className="text-[10px] text-muted-foreground">
+        {temp != null ? `${Math.round(temp)}°` : '—'}
+      </span>
+    </div>
+  )
+}
+
+// Each corner reports wear/temp across three zones of the tread. The SDK
+// names them L/M/R, but which edge is "outer" (facing away from the car)
+// flips between the left and right side of the car — flip the display
+// order here so "outer" always means outer regardless of corner.
+function TireCorner({ label, corner }) {
+  const outer = corner?.outer
+  const middle = corner?.middle
+  const inner = corner?.inner
+
+  return (
+    <Card className="w-fit overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-center text-xs">{label}</CardTitle>
       </CardHeader>
 
-      <CardContent className="px-2">
-        <div className="relative h-28 overflow-hidden rounded-md border bg-muted">
-          <div
-            className="absolute inset-x-0 bottom-0 bg-blue-500 transition-[height] duration-500 ease-out"
-            style={{ height: `${wear}%` }}
-          />
-
-          <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <span className="text-sm font-bold">{Math.round(wear)}%</span>
-          </div>
-        </div>
+      <CardContent className="flex gap-2 px-2">
+        <TireSection label="Out" wear={outer?.wear} temp={outer?.temp} />
+        <TireSection label="Mid" wear={middle?.wear} temp={middle?.temp} />
+        <TireSection label="In" wear={inner?.wear} temp={inner?.temp} />
       </CardContent>
     </Card>
   )
 }
 
-export function TireWearCard({
-  frontLeft,
-  frontRight,
-  rearLeft,
-  rearRight,
-}) {
+export function TireWearCard({ frontLeft, frontRight, rearLeft, rearRight }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <TireGauge label="FL" percentage={frontLeft} />
-      <TireGauge label="FR" percentage={frontRight} />
-      <TireGauge label="RL" percentage={rearLeft} />
-      <TireGauge label="RR" percentage={rearRight} />
+      <TireCorner label="FL" corner={frontLeft} />
+      <TireCorner label="FR" corner={frontRight} />
+      <TireCorner label="RL" corner={rearLeft} />
+      <TireCorner label="RR" corner={rearRight} />
     </div>
   )
 }

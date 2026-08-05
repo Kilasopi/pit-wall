@@ -10,10 +10,32 @@ function CarInfo({ telemetry, stintHistory }) {
   const percentage = telemetry?.FuelLevelPct != null ? telemetry.FuelLevelPct * 100 : 0;
   const fuelLitres = telemetry?.FuelLevel;
 
-  const frontLeft = telemetry?.TireWearFrontLeft;
-  const frontRight = telemetry?.TireWearFrontRight;
-  const rearLeft = telemetry?.TireWearRearLeft;
-  const rearRight = telemetry?.TireWearRearRight;
+  // The SDK reports wear (fraction remaining) and temp (°F) across three
+  // tread zones per corner, named L/M/R. Which edge is "outer" (facing
+  // away from the car) flips between the left and right side of the car,
+  // so left-side corners read L as outer/R as inner and right-side
+  // corners read the reverse.
+  function readCorner(prefix, outerSuffix, innerSuffix) {
+    return {
+      outer: {
+        wear: telemetry?.[`${prefix}wear${outerSuffix}`],
+        temp: telemetry?.[`${prefix}tempC${outerSuffix}`],
+      },
+      middle: {
+        wear: telemetry?.[`${prefix}wearM`],
+        temp: telemetry?.[`${prefix}tempCM`],
+      },
+      inner: {
+        wear: telemetry?.[`${prefix}wear${innerSuffix}`],
+        temp: telemetry?.[`${prefix}tempC${innerSuffix}`],
+      },
+    };
+  }
+
+  const frontLeft = readCorner('LF', 'L', 'R');
+  const frontRight = readCorner('RF', 'R', 'L');
+  const rearLeft = readCorner('LR', 'L', 'R');
+  const rearRight = readCorner('RR', 'R', 'L');
 
   // Only GTP/LMDh cars report this — everyone else just won't have the field.
   const hasBattery = typeof telemetry?.EnergyBattPct === 'number';
