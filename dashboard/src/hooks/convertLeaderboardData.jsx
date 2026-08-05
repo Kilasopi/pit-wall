@@ -52,12 +52,17 @@ export function getSessionClasses(drivers) {
   return [...seen.values()];
 }
 
-// Joins session driver info with live per-car telemetry arrays into rows
-// sorted by overall running position.
-export function buildLeaderboardRows(drivers, telemetry) {
+// Joins session driver info with live per-car telemetry arrays into rows.
+// Includes both iRacing's official race-classification fields (position,
+// F2Time gap) and raw on-track distance (lap + lap-distance-percent) —
+// the latter is what buildGapBoard uses instead, since the official
+// fields only get recomputed at lap/timing-line crossings while the raw
+// distance updates on every telemetry tick.
+function buildBaseRows(drivers, telemetry) {
   const position = telemetry?.CarIdxPosition;
   const classPosition = telemetry?.CarIdxClassPosition;
   const lap = telemetry?.CarIdxLap;
+  const lapDistPct = telemetry?.CarIdxLapDistPct;
   const bestLap = telemetry?.CarIdxBestLapTime;
   const lastLap = telemetry?.CarIdxLastLapTime;
   const onPitRoad = telemetry?.CarIdxOnPitRoad;
@@ -66,10 +71,14 @@ export function buildLeaderboardRows(drivers, telemetry) {
 
   const at = (arr, idx) => (Array.isArray(arr) ? arr[idx] : undefined);
 
-  const rows = (drivers ?? [])
+  return (drivers ?? [])
     .filter((driver) => !driver.CarIsPaceCar && !driver.IsSpectator)
     .map((driver) => {
       const idx = driver.CarIdx;
+      const rowLap = at(lap, idx) ?? 0;
+      const rowLapDistPct = at(lapDistPct, idx);
+      const bestLapSeconds = at(bestLap, idx);
+      const lastLapSeconds = at(lastLap, idx);
       return {
         carIdx: idx,
         classId: driver.CarClassID,
@@ -83,14 +92,30 @@ export function buildLeaderboardRows(drivers, telemetry) {
         safetyRating: driver.LicString ?? '—',
         position: at(position, idx) ?? 0,
         classPosition: at(classPosition, idx) ?? 0,
-        lap: at(lap, idx) ?? 0,
-        bestLapTime: formatLapTime(at(bestLap, idx)),
-        lastLapTime: formatLapTime(at(lastLap, idx)),
+        lap: rowLap,
+        // Total distance travelled in lap units — increases continuously
+        // as the car drives, unlike position/lap which only tick over at
+        // the start/finish line. This is what makes "who's physically
+        // between me and my rival" and "how far apart are we" update the
+        // instant an overtake happens instead of on the next lap.
+        trackDistance: rowLap >= 0 && rowLapDistPct != null ? rowLap + rowLapDistPct : null,
+        bestLapTime: formatLapTime(bestLapSeconds),
+        lastLapTime: formatLapTime(lastLapSeconds),
+        bestLapSeconds: bestLapSeconds > 0 ? bestLapSeconds : null,
+        lastLapSeconds: lastLapSeconds > 0 ? lastLapSeconds : null,
         gapToLeaderSeconds: at(gapToLeader, idx),
         onPitRoad: !!at(onPitRoad, idx),
         onTrack: at(trackSurface, idx) != null && at(trackSurface, idx) !== -1,
       };
-    })
+    });
+}
+
+// Joins session driver info with live per-car telemetry arrays into rows
+// sorted by overall running position — iRacing's official classification,
+// which only updates at lap/timing-line crossings. Used for the
+// Leaderboard page, which should reflect the official running order.
+export function buildLeaderboardRows(drivers, telemetry) {
+  const rows = buildBaseRows(drivers, telemetry)
     .filter((row) => row.position > 0)
     .sort((a, b) => a.position - b.position);
 
@@ -136,12 +161,58 @@ export function buildLeaderboardRows(drivers, telemetry) {
   });
 }
 
+// Per-car traffic gaps ride on CarIdxF2Time, which iRacing only
+// recomputes at timing-line crossings rather than continuously — so a
+// per-car gap number looks like it's "stuck" between laps even though
+// it's accurate at the moment it updates. A class breakdown (counts, not
+// individual gaps) sidesteps that: it only changes when the traffic
+// itself changes, i.e. when the player actually clears a car, which is
+// the update cadence that actually matches what changed.
+function summarizeTrafficByClass(traffic) {
+  const byClass = new Map();
+  for (const car of traffic) {
+    const existing = byClass.get(car.classId);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byClass.set(car.classId, {
+        classId: car.classId,
+        shortName: car.classShortName,
+        color: car.classColor,
+        count: 1,
+      });
+    }
+  }
+  return [...byClass.values()];
+}
+
+// Estimates a live, continuously-ticking time gap between two rows from
+// their track-distance difference and a recent lap time, instead of
+// iRacing's own F2Time (which only updates at timing-line crossings).
+// aheadRow must actually be ahead of behindRow in trackDistance.
+function liveGapSeconds(aheadRow, behindRow) {
+  if (aheadRow?.trackDistance == null || behindRow?.trackDistance == null) return null;
+  const distanceGapLaps = aheadRow.trackDistance - behindRow.trackDistance;
+  if (distanceGapLaps < 0) return null;
+
+  const lapTime =
+    behindRow.lastLapSeconds ?? behindRow.bestLapSeconds ?? aheadRow.lastLapSeconds ?? aheadRow.bestLapSeconds;
+  if (lapTime == null) return null;
+
+  return distanceGapLaps * lapTime;
+}
+
 // Finds the player's next same-class rival ahead on track, plus any
 // different-class cars physically between them ("traffic") — iRacing has
-// no such field directly, so this walks the position-sorted rows built
-// above and compares classId against the player's.
+// no such field directly. Ordered by raw on-track distance rather than
+// official race position/gap so both the traffic list and the gap time
+// update the instant an overtake happens, not on the next lap/timing-line
+// crossing.
 export function buildGapBoard(drivers, telemetry, playerCarIdx) {
-  const rows = buildLeaderboardRows(drivers, telemetry);
+  const rows = buildBaseRows(drivers, telemetry)
+    .filter((row) => row.trackDistance != null)
+    .sort((a, b) => b.trackDistance - a.trackDistance);
+
   const playerIndex = rows.findIndex((row) => row.carIdx === playerCarIdx);
   if (playerIndex === -1) return null;
 
@@ -172,29 +243,23 @@ export function buildGapBoard(drivers, telemetry, playerCarIdx) {
   }
   // Walked forward, already in running order — no reverse needed here.
 
-  const gapSeconds =
-    classCarAhead && player.gapToLeaderSeconds != null && classCarAhead.gapToLeaderSeconds != null
-      ? player.gapToLeaderSeconds - classCarAhead.gapToLeaderSeconds
-      : null;
   const lapsDownAhead = classCarAhead ? lapsBehind(classCarAhead.lap, player.lap) : 0;
+  const gapSeconds = classCarAhead ? liveGapSeconds(classCarAhead, player) : null;
 
-  const gapBehindSeconds =
-    classCarBehind && player.gapToLeaderSeconds != null && classCarBehind.gapToLeaderSeconds != null
-      ? classCarBehind.gapToLeaderSeconds - player.gapToLeaderSeconds
-      : null;
   const lapsDownBehind = classCarBehind ? lapsBehind(player.lap, classCarBehind.lap) : 0;
+  const gapBehindSeconds = classCarBehind ? liveGapSeconds(player, classCarBehind) : null;
 
   return {
     player,
     classCarAhead,
     gap: classCarAhead ? formatGapOrLaps(gapSeconds, false, lapsDownAhead) : 'Class leader',
-    traffic,
     trafficCount: traffic.length,
+    trafficByClass: summarizeTrafficByClass(traffic),
     classCarBehind,
     gapBehind: classCarBehind
       ? formatGapOrLaps(gapBehindSeconds, false, lapsDownBehind)
       : 'Last in class',
-    trafficBehind,
     trafficBehindCount: trafficBehind.length,
+    trafficBehindByClass: summarizeTrafficByClass(trafficBehind),
   };
 }

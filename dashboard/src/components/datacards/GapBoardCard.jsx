@@ -8,6 +8,28 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { buildGapBoard } from '@/hooks/convertLeaderboardData';
 
+function TrafficSummary({ count, byClass }) {
+  if (count === 0) {
+    return <p className="text-sm text-muted-foreground">Clear track — no traffic in between.</p>;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm text-muted-foreground">
+        {count} car{count === 1 ? '' : 's'} of traffic in between:
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {byClass.map((cls) => (
+          <Badge key={cls.classId} variant="outline" className="gap-1.5">
+            <span className="size-2 rounded-full" style={{ backgroundColor: cls.color }} />
+            {cls.count} {cls.shortName}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function GapBoardCard({ session, telemetry }) {
   const drivers = session?.DriverInfo?.Drivers ?? [];
   // CamCarIdx, not DriverInfo.DriverCarIdx — this rig spectates via camera
@@ -59,36 +81,7 @@ export function GapBoardCard({ session, telemetry }) {
                     <span className="text-lg font-semibold tabular-nums">{board.gap}</span>
                   </div>
 
-                  {board.trafficCount === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Clear track — no traffic in between.
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <p className="text-sm text-muted-foreground">
-                        {board.trafficCount} car{board.trafficCount === 1 ? '' : 's'} of traffic in
-                        between:
-                      </p>
-                      <ul className="space-y-1">
-                        {board.traffic.map((car) => (
-                          <li
-                            key={car.carIdx}
-                            className="flex items-center justify-between text-sm text-muted-foreground"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span
-                                className="size-2 rounded-full"
-                                style={{ backgroundColor: car.classColor }}
-                              />
-                              #{car.carNumber ?? '—'} {car.driverName ?? '—'}
-                              <span className="text-xs">({car.classShortName})</span>
-                            </span>
-                            <span className="tabular-nums">{car.interval}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <TrafficSummary count={board.trafficCount} byClass={board.trafficByClass} />
                 </>
               )}
             </div>
@@ -117,36 +110,10 @@ export function GapBoardCard({ session, telemetry }) {
                     <span className="text-lg font-semibold tabular-nums">{board.gapBehind}</span>
                   </div>
 
-                  {board.trafficBehindCount === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Clear track — no traffic in between.
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <p className="text-sm text-muted-foreground">
-                        {board.trafficBehindCount} car{board.trafficBehindCount === 1 ? '' : 's'} of
-                        traffic in between:
-                      </p>
-                      <ul className="space-y-1">
-                        {board.trafficBehind.map((car) => (
-                          <li
-                            key={car.carIdx}
-                            className="flex items-center justify-between text-sm text-muted-foreground"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span
-                                className="size-2 rounded-full"
-                                style={{ backgroundColor: car.classColor }}
-                              />
-                              #{car.carNumber ?? '—'} {car.driverName ?? '—'}
-                              <span className="text-xs">({car.classShortName})</span>
-                            </span>
-                            <span className="tabular-nums">{car.interval}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <TrafficSummary
+                    count={board.trafficBehindCount}
+                    byClass={board.trafficBehindByClass}
+                  />
                 </>
               )}
             </div>

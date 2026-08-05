@@ -26,7 +26,7 @@ function fuelVariant(lapsRemaining) {
 
 function PitWall({ stint, fuel, incidents, telemetry, session, trackMap }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid items-start gap-4 md:grid-cols-2">
       <TrackMapCard trackMap={trackMap} telemetry={telemetry} session={session} />
 
       <GapBoardCard telemetry={telemetry} session={session} />
