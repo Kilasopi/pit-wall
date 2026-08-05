@@ -52,6 +52,12 @@ class StrategyEngine {
         this._currentCarName = null;
         this._lastSettings = null;
         this._lockedCarNumber = null;
+        // Total laps per driver name, persisted across that driver's
+        // stints in this session — a double stint (same driver, pits for
+        // fuel only, never actually gets out) never fires a swap, so
+        // _lapsAtStintStart just keeps accumulating instead of resetting.
+        this._totalLapsByDriver = new Map();
+        this._lapsAtStintStart = 0;
     }
 
     ingestSession(sessionInfo) {
@@ -68,11 +74,19 @@ class StrategyEngine {
 
     // Returns an array of events for this telemetry tick, any of:
     //   { type: 'swap', driver, carNumber, carName, lap, previousSettings }
-    //   { type: 'lap', lapsCompletedThisStint }
+    //   { type: 'lap', lapsCompletedThisStint, totalLapsCompleted }
     //   { type: 'incident', points, lap }
     ingestTelemetry(values) {
         const events = [];
-        const lap = typeof values.Lap === 'number' ? values.Lap : null;
+        // CarIdxLap[watchedCarIdx], not values.Lap (the player/rig's own
+        // car) — while spectating or locked onto someone else's car, those
+        // are different cars, and using the player's own lap count meant
+        // the tracked stint's lap counter never moved at all.
+        const carIdx = this._resolveCarIdx(values);
+        const lap =
+            typeof carIdx === 'number' && Array.isArray(values.CarIdxLap)
+                ? values.CarIdxLap[carIdx] ?? null
+                : null;
 
         const isFirstTick = this._lastDCDriversSoFar === null && this._lastCamCarIdx === null;
 
@@ -107,6 +121,12 @@ class StrategyEngine {
             this._currentCarNumber = carNumber;
             this._currentCarName = carName;
             this._lapAtStintStart = lap ?? 0;
+            // Seed this driver's running total from whatever they'd already
+            // accumulated in earlier stints this session (0 for a driver's
+            // first stint) — a double stint never reaches this branch at
+            // all (see class comment), so this only fires on a genuine
+            // driver change.
+            this._lapsAtStintStart = this._totalLapsByDriver.get(driver) ?? 0;
             // this._lastSettings is whatever was last recorded for the
             // outgoing driver's stint (previous tick, before this swap) —
             // the incoming driver's own settings get recorded below as
@@ -118,10 +138,12 @@ class StrategyEngine {
 
         if (lap !== null && lap !== this._lastLap) {
             this._lastLap = lap;
-            events.push({
-                type: 'lap',
-                lapsCompletedThisStint: Math.max(0, lap - (this._lapAtStintStart ?? lap)),
-            });
+            const lapsCompletedThisStint = Math.max(0, lap - (this._lapAtStintStart ?? lap));
+            const totalLapsCompleted = this._lapsAtStintStart + lapsCompletedThisStint;
+            if (this._currentDriver) {
+                this._totalLapsByDriver.set(this._currentDriver, totalLapsCompleted);
+            }
+            events.push({ type: 'lap', lapsCompletedThisStint, totalLapsCompleted });
         }
 
         if (typeof values.PlayerCarTeamIncidentCount === 'number') {
@@ -140,28 +162,35 @@ class StrategyEngine {
             driver: this._currentDriver,
             carNumber: this._currentCarNumber,
             carName: this._currentCarName,
+            totalLapsCompleted: this._totalLapsByDriver.get(this._currentDriver) ?? 0,
         };
+    }
+
+    // The car this engine is currently tracking, as a CarIdx — needed to
+    // pull that car's own CarIdxLap[]/etc telemetry rather than the
+    // player/rig's own.
+    _resolveCarIdx(values) {
+        if (this._lockedCarNumber != null) {
+            const drivers = this._sessionInfo?.DriverInfo?.Drivers;
+            const info = Array.isArray(drivers)
+                ? drivers.find((d) => String(d.CarNumber) === this._lockedCarNumber)
+                : null;
+            return info?.CarIdx ?? null;
+        }
+        // CamCarIdx (whichever car the camera is on), not PlayerCarIdx
+        // (your own car slot as a session participant) — when spectating,
+        // those differ, and PlayerCarIdx never follows the camera to an AI
+        // car.
+        return typeof values.CamCarIdx === 'number' ? values.CamCarIdx : null;
     }
 
     _resolveCurrentDriver(values) {
         const drivers = this._sessionInfo?.DriverInfo?.Drivers;
-
-        let info = null;
-        if (this._lockedCarNumber != null) {
-            info = Array.isArray(drivers)
-                ? drivers.find((d) => String(d.CarNumber) === this._lockedCarNumber)
+        const carIdx = this._resolveCarIdx(values);
+        const info =
+            Array.isArray(drivers) && typeof carIdx === 'number'
+                ? drivers.find((d) => d.CarIdx === carIdx)
                 : null;
-        } else {
-            // CamCarIdx (whichever car the camera is on), not PlayerCarIdx
-            // (your own car slot as a session participant) — when
-            // spectating, those differ, and PlayerCarIdx never follows the
-            // camera to an AI car.
-            const carIdx = values.CamCarIdx;
-            info =
-                Array.isArray(drivers) && typeof carIdx === 'number'
-                    ? drivers.find((d) => d.CarIdx === carIdx)
-                    : null;
-        }
 
         return {
             driver: info?.UserName ?? 'Unknown driver',

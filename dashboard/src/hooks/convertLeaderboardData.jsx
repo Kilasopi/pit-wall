@@ -93,11 +93,18 @@ function buildBaseRows(drivers, telemetry) {
         position: at(position, idx) ?? 0,
         classPosition: at(classPosition, idx) ?? 0,
         lap: rowLap,
+        // 0-1 position around the current lap, ignoring total laps
+        // completed — this is what "who's physically next to me on track
+        // right now" has to sort by. A lapped leader can have a
+        // trackDistance a lap+ higher than the player while being right on
+        // their bumper physically; only lapDistPct captures that.
+        lapDistPct: rowLapDistPct ?? null,
         // Total distance travelled in lap units — increases continuously
         // as the car drives, unlike position/lap which only tick over at
-        // the start/finish line. This is what makes "who's physically
-        // between me and my rival" and "how far apart are we" update the
-        // instant an overtake happens instead of on the next lap.
+        // the start/finish line. Used for "how far apart are we" (a smooth
+        // number that updates every tick) and for telling a genuine
+        // same-lap rival apart from a lapped car — NOT for "who's
+        // physically nearby", which needs lapDistPct instead (see above).
         trackDistance: rowLap >= 0 && rowLapDistPct != null ? rowLap + rowLapDistPct : null,
         bestLapTime: formatLapTime(bestLapSeconds),
         lastLapTime: formatLapTime(lastLapSeconds),
@@ -202,60 +209,106 @@ function liveGapSeconds(aheadRow, behindRow) {
   return distanceGapLaps * lapTime;
 }
 
-// Finds the player's next same-class rival ahead on track, plus any
-// different-class cars physically between them ("traffic") — iRacing has
-// no such field directly. Ordered by raw on-track distance rather than
-// official race position/gap so both the traffic list and the gap time
-// update the instant an overtake happens, not on the next lap/timing-line
-// crossing.
+// Finds the player's next same-class rival ahead/behind, plus any cars
+// physically between them ("traffic") — iRacing has no such field
+// directly. WHO the rival is comes from official class position (P7/P8/P9
+// — authoritative, and correct even for a car that's lapped the player
+// several times but happens to be momentarily close by while catching up
+// for another lap). The traffic list and gap time, however, are still
+// live: which cars are physically between the player and that known rival
+// updates every tick via on-track position, not just at lap crossings.
 export function buildGapBoard(drivers, telemetry, playerCarIdx) {
-  const rows = buildBaseRows(drivers, telemetry)
-    .filter((row) => row.trackDistance != null)
-    .sort((a, b) => b.trackDistance - a.trackDistance);
+  const rows = buildBaseRows(drivers, telemetry).filter(
+    (row) => row.trackDistance != null && row.lapDistPct != null
+  );
 
-  const playerIndex = rows.findIndex((row) => row.carIdx === playerCarIdx);
-  if (playerIndex === -1) return null;
+  const player = rows.find((row) => row.carIdx === playerCarIdx);
+  if (!player) return null;
 
-  const player = rows[playerIndex];
+  const classCarAhead =
+    player.classPosition > 1
+      ? rows.find(
+          (row) => row.classId === player.classId && row.classPosition === player.classPosition - 1
+        ) ?? null
+      : null;
+  const classCarBehind =
+    rows.find(
+      (row) => row.classId === player.classId && row.classPosition === player.classPosition + 1
+    ) ?? null;
 
-  let classCarAhead = null;
+  // Physical position around the current lap (0→1, wrapping) — not
+  // accumulated trackDistance, which would sort a lapped car nowhere near
+  // the player despite them being right on track next to each other.
+  const byPct = [...rows].sort((a, b) => a.lapDistPct - b.lapDistPct);
+  const n = byPct.length;
+  const playerPctIndex = byPct.findIndex((row) => row.carIdx === playerCarIdx);
+
+  // Walk physically forward from the player to the known rival ahead,
+  // collecting everyone passed along the way as traffic — correctly picks
+  // up lapped cars/the leader lapping through, live, every tick.
   const traffic = [];
-  for (let i = playerIndex - 1; i >= 0; i--) {
-    const candidate = rows[i];
-    if (candidate.classId === player.classId) {
-      classCarAhead = candidate;
-      break;
+  if (classCarAhead) {
+    for (let step = 1; step < n; step++) {
+      const candidate = byPct[(playerPctIndex + step) % n];
+      if (candidate.carIdx === classCarAhead.carIdx) break;
+      traffic.push(candidate);
     }
-    traffic.push(candidate);
+    traffic.reverse();
   }
-  // Walked backwards (closest to player first) — flip to running order.
-  traffic.reverse();
 
-  let classCarBehind = null;
   const trafficBehind = [];
-  for (let i = playerIndex + 1; i < rows.length; i++) {
-    const candidate = rows[i];
-    if (candidate.classId === player.classId) {
-      classCarBehind = candidate;
-      break;
+  if (classCarBehind) {
+    for (let step = 1; step < n; step++) {
+      const candidate = byPct[(playerPctIndex - step + n) % n];
+      if (candidate.carIdx === classCarBehind.carIdx) break;
+      trafficBehind.push(candidate);
     }
-    trafficBehind.push(candidate);
   }
-  // Walked forward, already in running order — no reverse needed here.
 
-  const lapsDownAhead = classCarAhead ? lapsBehind(classCarAhead.lap, player.lap) : 0;
+  // How many whole laps of *track distance* separate the player and their
+  // rival — not raw CarIdxLap integers, which jump by 1 the instant either
+  // car crosses start/finish even if they're only a car-length apart.
+  // trackDistance (lap + lap%) changes continuously, so this only reaches
+  // 1 once the gap has genuinely grown to a full lap, not at a crossing.
+  const lapsDownByDistance = (fartherTrackDistance, closerTrackDistance) => {
+    if (fartherTrackDistance == null || closerTrackDistance == null) return 0;
+    return Math.max(0, Math.floor(fartherTrackDistance - closerTrackDistance));
+  };
+
+  const lapsDownAhead = classCarAhead
+    ? lapsDownByDistance(classCarAhead.trackDistance, player.trackDistance)
+    : 0;
   const gapSeconds = classCarAhead ? liveGapSeconds(classCarAhead, player) : null;
+  // iRacing's own gap-to-leader per car, differenced — accurate but only
+  // steps at timing-line crossings. GapBoardCard blends this with the
+  // continuously-ticking distance estimate above (see useBlendedGapSeconds).
+  const gapOfficialSeconds =
+    classCarAhead && player.gapToLeaderSeconds != null && classCarAhead.gapToLeaderSeconds != null
+      ? player.gapToLeaderSeconds - classCarAhead.gapToLeaderSeconds
+      : null;
 
-  const lapsDownBehind = classCarBehind ? lapsBehind(player.lap, classCarBehind.lap) : 0;
+  const lapsDownBehind = classCarBehind
+    ? lapsDownByDistance(player.trackDistance, classCarBehind.trackDistance)
+    : 0;
   const gapBehindSeconds = classCarBehind ? liveGapSeconds(player, classCarBehind) : null;
+  const gapBehindOfficialSeconds =
+    classCarBehind && classCarBehind.gapToLeaderSeconds != null && player.gapToLeaderSeconds != null
+      ? classCarBehind.gapToLeaderSeconds - player.gapToLeaderSeconds
+      : null;
 
   return {
     player,
     classCarAhead,
+    gapSeconds,
+    gapOfficialSeconds,
+    lapsDownAhead,
     gap: classCarAhead ? formatGapOrLaps(gapSeconds, false, lapsDownAhead) : 'Class leader',
     trafficCount: traffic.length,
     trafficByClass: summarizeTrafficByClass(traffic),
     classCarBehind,
+    gapBehindSeconds,
+    gapBehindOfficialSeconds,
+    lapsDownBehind,
     gapBehind: classCarBehind
       ? formatGapOrLaps(gapBehindSeconds, false, lapsDownBehind)
       : 'Last in class',

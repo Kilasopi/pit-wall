@@ -41,7 +41,7 @@ function getPointAndNormal(pathEl, pathLength, pct) {
 // getPointAtLength — same technique community iRacing overlays use, since
 // telemetry only gives lap-distance percent (0-1), not X/Y. Works the same
 // whether the path is a real outline or the generic stand-in above.
-export function TrackMapCard({ trackMap, telemetry, session }) {
+export function TrackMapCard({ trackMap, telemetry, session, lockedCarNumber }) {
   const pathRef = useRef(null);
   const [pathLength, setPathLength] = useState(0);
   const [bounds, setBounds] = useState(null);
@@ -56,9 +56,14 @@ export function TrackMapCard({ trackMap, telemetry, session }) {
   }, [trackPath]);
 
   const drivers = session?.DriverInfo?.Drivers ?? [];
-  // CamCarIdx, not DriverInfo.DriverCarIdx — see GapBoardCard.jsx for why.
-  const playerCarIdx = telemetry?.CamCarIdx;
+  // Locked car takes priority over the camera — see GapBoardCard.jsx for
+  // why. CamCarIdx, not DriverInfo.DriverCarIdx, when unlocked.
+  const playerCarIdx =
+    lockedCarNumber != null
+      ? drivers.find((d) => String(d.CarNumber) === String(lockedCarNumber))?.CarIdx
+      : telemetry?.CamCarIdx;
   const lapDistPct = telemetry?.CarIdxLapDistPct;
+  const carIdxLap = telemetry?.CarIdxLap;
   const trackSurface = telemetry?.CarIdxTrackSurface;
 
   // Multi-class fields plotted on the same lap-distance pct would all sit
@@ -73,17 +78,44 @@ export function TrackMapCard({ trackMap, telemetry, session }) {
     .map((driver) => {
       const idx = driver.CarIdx;
       const pct = Array.isArray(lapDistPct) ? lapDistPct[idx] : undefined;
+      const lap = Array.isArray(carIdxLap) ? carIdxLap[idx] : undefined;
       const surface = Array.isArray(trackSurface) ? trackSurface[idx] : undefined;
       return {
         idx,
         driver,
         pct,
+        // Accumulated distance, not just current-lap pct — needed to tell
+        // "briefly adjacent because both are near the line" apart from
+        // "genuinely a lap ahead/behind" for the outline coloring below.
+        trackDistance: typeof lap === 'number' && lap >= 0 && pct != null ? lap + pct : null,
         onTrack: surface != null && surface !== -1,
         classColor: classColorToCss(driver.CarClassColor),
         laneIndex: classLaneIndex.get(driver.CarClassID) ?? 0,
       };
     })
     .filter((car) => car.onTrack && car.pct != null && car.pct >= 0);
+
+  const playerTrackDistance = cars.find((car) => car.idx === playerCarIdx)?.trackDistance ?? null;
+
+  // Outline color signals lap status relative to the player: blue for a
+  // car the player has lapped, red for a car that's lapped the player.
+  // Uses accumulated trackDistance rather than raw CarIdxLap so this
+  // doesn't flicker the instant either car crosses start/finish — only
+  // once the gap has genuinely reached a full lap (see GapBoardCard.jsx's
+  // same fix for the traffic/gap logic).
+  function lapStatus(car) {
+    if (playerTrackDistance == null || car.trackDistance == null) return null;
+    const diff = car.trackDistance - playerTrackDistance;
+    if (diff >= 1) return 'ahead'; // at least a lap ahead
+    if (diff <= -1) return 'behind'; // lapped by the player
+    return null;
+  }
+
+  function lapStatusStroke(car, status) {
+    if (status === 'ahead') return '#ef4444';
+    if (status === 'behind') return '#3b82f6';
+    return car.idx === playerCarIdx ? 'white' : 'black';
+  }
 
   const strokeWidth = bounds ? Math.max(bounds.width, bounds.height) * 0.012 : 20;
   const carRadius = bounds ? Math.max(bounds.width, bounds.height) * 0.008 : 14;
@@ -166,20 +198,29 @@ export function TrackMapCard({ trackMap, telemetry, session }) {
               strokeWidth={marker.status === 'clear' ? strokeWidth * 0.15 : strokeWidth * 0.3}
             />
           ))}
-          {points.map((car) => (
-            <circle
-              key={car.idx}
-              cx={car.x}
-              cy={car.y}
-              r={car.idx === playerCarIdx ? carRadius * 1.3 : carRadius}
-              strokeWidth={car.idx === playerCarIdx ? strokeWidth * 0.4 : strokeWidth * 0.2}
-              style={{
-                fill: car.classColor,
-                stroke: car.idx === playerCarIdx ? 'white' : 'black',
-                transition: 'cx 0.1s linear, cy 0.1s linear',
-              }}
-            />
-          ))}
+          {points.map((car) => {
+            const status = lapStatus(car);
+            // A lap-status outline needs to be at least as thick as the
+            // player's own highlight ring to actually read as a color at
+            // this dot size — the default 0.2x stroke used for a plain
+            // (same-lap) car is too thin to notice.
+            const isPlayer = car.idx === playerCarIdx;
+            const emphasized = isPlayer || status != null;
+            return (
+              <circle
+                key={car.idx}
+                cx={car.x}
+                cy={car.y}
+                r={isPlayer ? carRadius * 1.3 : carRadius}
+                strokeWidth={emphasized ? strokeWidth * 0.4 : strokeWidth * 0.2}
+                style={{
+                  fill: car.classColor,
+                  stroke: lapStatusStroke(car, status),
+                  transition: 'cx 0.1s linear, cy 0.1s linear',
+                }}
+              />
+            );
+          })}
         </svg>
       </CardContent>
     </Card>

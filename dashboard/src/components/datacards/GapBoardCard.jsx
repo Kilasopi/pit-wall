@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   Card,
   CardHeader,
@@ -6,7 +7,28 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { buildGapBoard } from '@/hooks/convertLeaderboardData';
+import { buildGapBoard, formatGap } from '@/hooks/convertLeaderboardData';
+
+// iRacing's own gap-to-leader (F2Time-derived) is accurate but only steps
+// at timing-line crossings — showing it alone looks frozen between them.
+// The raw distance-based estimate ticks every frame but drifts noticeably
+// since it assumes constant pace across the lap. This blends them: anchor
+// to the official value whenever it changes (a real crossing, or a new
+// car pairing after an overtake), then ride the distance estimate's
+// *change* since that anchor rather than trusting its absolute value.
+function useBlendedGap(officialSeconds, liveSeconds, pairKey) {
+  const baselineRef = useRef({ key: null, official: null, live: null });
+
+  if (officialSeconds == null || liveSeconds == null) return liveSeconds;
+
+  const baseline = baselineRef.current;
+  if (baseline.key !== pairKey || baseline.official !== officialSeconds) {
+    baselineRef.current = { key: pairKey, official: officialSeconds, live: liveSeconds };
+    return officialSeconds;
+  }
+
+  return baseline.official + (liveSeconds - baseline.live);
+}
 
 function TrafficSummary({ count, byClass }) {
   if (count === 0) {
@@ -30,14 +52,43 @@ function TrafficSummary({ count, byClass }) {
   );
 }
 
-export function GapBoardCard({ session, telemetry }) {
+export function GapBoardCard({ session, telemetry, lockedCarNumber }) {
   const drivers = session?.DriverInfo?.Drivers ?? [];
-  // CamCarIdx, not DriverInfo.DriverCarIdx — this rig spectates via camera
-  // rather than driving a fixed session slot, and DriverCarIdx doesn't
-  // follow the camera (see agent/strategy_engine.js for the same reasoning).
-  const playerCarIdx = telemetry?.CamCarIdx;
+  // If spectator-locked to a car (see SpectateLockCard/agent/
+  // strategy_engine.js), the gap board has to track that same car too —
+  // otherwise it silently follows wherever the camera drifts while the
+  // rest of the pitwall (stint, incidents) stays on the locked car,
+  // producing gaps for a completely different car than what's displayed.
+  // CamCarIdx, not DriverInfo.DriverCarIdx, when unlocked — this rig
+  // spectates via camera rather than driving a fixed session slot, and
+  // DriverCarIdx doesn't follow the camera (see agent/strategy_engine.js
+  // for the same reasoning).
+  const playerCarIdx =
+    lockedCarNumber != null
+      ? drivers.find((d) => String(d.CarNumber) === String(lockedCarNumber))?.CarIdx
+      : telemetry?.CamCarIdx;
   const hasSession = drivers.length > 0;
   const board = buildGapBoard(drivers, telemetry, playerCarIdx);
+
+  // Hooks run unconditionally even though board can be null (not on
+  // track yet) — both just pass through nulls in that case.
+  const blendedAhead = useBlendedGap(
+    board?.gapOfficialSeconds ?? null,
+    board?.gapSeconds ?? null,
+    board?.classCarAhead?.carIdx ?? null
+  );
+  const blendedBehind = useBlendedGap(
+    board?.gapBehindOfficialSeconds ?? null,
+    board?.gapBehindSeconds ?? null,
+    board?.classCarBehind?.carIdx ?? null
+  );
+  // Laps-down cars show "-N Laps", not a time — never blend that case.
+  const gapDisplay =
+    board?.classCarAhead && board.lapsDownAhead === 0 ? formatGap(blendedAhead, false) : board?.gap;
+  const gapBehindDisplay =
+    board?.classCarBehind && board.lapsDownBehind === 0
+      ? formatGap(blendedBehind, false)
+      : board?.gapBehind;
 
   return (
     <Card>
@@ -78,7 +129,7 @@ export function GapBoardCard({ session, telemetry }) {
                       </span>
                       <Badge variant="outline">P{board.classCarAhead.classPosition} in class</Badge>
                     </div>
-                    <span className="text-lg font-semibold tabular-nums">{board.gap}</span>
+                    <span className="text-lg font-semibold tabular-nums">{gapDisplay}</span>
                   </div>
 
                   <TrafficSummary count={board.trafficCount} byClass={board.trafficByClass} />
@@ -107,7 +158,7 @@ export function GapBoardCard({ session, telemetry }) {
                       </span>
                       <Badge variant="outline">P{board.classCarBehind.classPosition} in class</Badge>
                     </div>
-                    <span className="text-lg font-semibold tabular-nums">{board.gapBehind}</span>
+                    <span className="text-lg font-semibold tabular-nums">{gapBehindDisplay}</span>
                   </div>
 
                   <TrafficSummary

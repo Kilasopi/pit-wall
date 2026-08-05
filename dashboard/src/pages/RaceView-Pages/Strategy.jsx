@@ -80,10 +80,14 @@ function StintHistoryCard({ stint, stintHistory }) {
   );
 }
 
-function PitCycleTrackerCard({ session, telemetry }) {
+function PitCycleTrackerCard({ session, telemetry, lockedCarNumber }) {
   const drivers = session?.DriverInfo?.Drivers ?? [];
-  // CamCarIdx, not DriverInfo.DriverCarIdx — see GapBoardCard.jsx for why.
-  const playerCarIdx = telemetry?.CamCarIdx;
+  // Locked car takes priority over the camera — see GapBoardCard.jsx for
+  // why. CamCarIdx, not DriverInfo.DriverCarIdx, when unlocked.
+  const playerCarIdx =
+    lockedCarNumber != null
+      ? drivers.find((d) => String(d.CarNumber) === String(lockedCarNumber))?.CarIdx
+      : telemetry?.CamCarIdx;
   const tracker = usePitCycleTracker(telemetry);
 
   const allRows = buildLeaderboardRows(drivers, telemetry);
@@ -145,10 +149,10 @@ function PitCycleTrackerCard({ session, telemetry }) {
   );
 }
 
-function Strategy({ session, telemetry, stint, stintHistory }) {
+function Strategy({ session, telemetry, stint, stintHistory, lockedCarNumber }) {
   return (
     <div className="space-y-4">
-      <PitCycleTrackerCard session={session} telemetry={telemetry} />
+      <PitCycleTrackerCard session={session} telemetry={telemetry} lockedCarNumber={lockedCarNumber} />
       <StintHistoryCard stint={stint} stintHistory={stintHistory ?? []} />
     </div>
   );

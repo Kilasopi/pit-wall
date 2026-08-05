@@ -170,7 +170,12 @@ async function handleSwap(teamId, team, { driver, carNumber, carName, previousSe
 
     team.lastLapsCompleted = 0;
     team.currentStintSummary = { driver, carNumber, carName, startedAt: endedAt };
-    dashboard.broadcast('stint', { driver, carNumber, carName, lapsCompleted: 0 }, teamId);
+    const { totalLapsCompleted } = team.strategyEngine.currentDriver();
+    dashboard.broadcast(
+        'stint',
+        { driver, carNumber, carName, lapsCompleted: 0, totalLapsCompleted },
+        teamId
+    );
 
     if (storage) {
         team.currentStintId = await storage.openStint({
@@ -182,12 +187,12 @@ async function handleSwap(teamId, team, { driver, carNumber, carName, previousSe
     }
 }
 
-async function handleLap(teamId, team, { lapsCompletedThisStint }) {
+async function handleLap(teamId, team, { lapsCompletedThisStint, totalLapsCompleted }) {
     team.lastLapsCompleted = lapsCompletedThisStint;
     const { driver, carNumber, carName } = team.strategyEngine.currentDriver();
     dashboard.broadcast(
         'stint',
-        { driver, carNumber, carName, lapsCompleted: lapsCompletedThisStint },
+        { driver, carNumber, carName, lapsCompleted: lapsCompletedThisStint, totalLapsCompleted },
         teamId
     );
 
@@ -302,7 +307,11 @@ dashboard.on('connection', (ws) => {
             dashboard.sendTo(
                 ws,
                 'stint',
-                { ...team.currentStintSummary, lapsCompleted: team.lastLapsCompleted },
+                {
+                    ...team.currentStintSummary,
+                    lapsCompleted: team.lastLapsCompleted,
+                    totalLapsCompleted: team.strategyEngine.currentDriver().totalLapsCompleted,
+                },
                 teamId
             );
         }

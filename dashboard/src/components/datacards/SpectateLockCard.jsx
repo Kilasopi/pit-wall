@@ -26,6 +26,13 @@ export function SpectateLockCard({ session, lockedCarNumber, lockCar }) {
   );
 
   const value = lockedCarNumber ?? FOLLOW_CAMERA;
+  const lockedDriver = lockedCarNumber
+    ? cars.find((d) => String(d.CarNumber) === String(lockedCarNumber))
+    : null;
+  const valueLabel =
+    value === FOLLOW_CAMERA
+      ? 'Follow camera'
+      : `#${lockedCarNumber} — ${lockedDriver?.UserName ?? 'Unknown driver'}`;
 
   return (
     <Card>
@@ -43,7 +50,7 @@ export function SpectateLockCard({ session, lockedCarNumber, lockCar }) {
           onValueChange={(v) => lockCar?.(v === FOLLOW_CAMERA ? null : v)}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Follow camera" />
+            <SelectValue placeholder="Follow camera">{valueLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={FOLLOW_CAMERA}>Follow camera</SelectItem>

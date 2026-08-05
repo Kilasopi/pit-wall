@@ -37,7 +37,12 @@ function PitWall({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <TrackMapCard trackMap={trackMap} telemetry={telemetry} session={session} />
+      <TrackMapCard
+        trackMap={trackMap}
+        telemetry={telemetry}
+        session={session}
+        lockedCarNumber={lockedCarNumber}
+      />
 
       <div className="grid items-start gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-4">
@@ -55,8 +60,10 @@ function PitWall({
                   <dd>{stint.driver}</dd>
                   <dt className="text-muted-foreground">Car</dt>
                   <dd>{stint.carName ?? '—'}</dd>
-                  <dt className="text-muted-foreground">Laps completed</dt>
+                  <dt className="text-muted-foreground">Laps this stint</dt>
                   <dd>{stint.lapsCompleted ?? '—'}</dd>
+                  <dt className="text-muted-foreground">Total laps (driver)</dt>
+                  <dd>{stint.totalLapsCompleted ?? '—'}</dd>
                 </dl>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -134,7 +141,7 @@ function PitWall({
 
         <div className="flex flex-col gap-4">
           <SpectateLockCard session={session} lockedCarNumber={lockedCarNumber} lockCar={lockCar} />
-          <GapBoardCard telemetry={telemetry} session={session} />
+          <GapBoardCard telemetry={telemetry} session={session} lockedCarNumber={lockedCarNumber} />
         </div>
       </div>
     </div>
