@@ -20,7 +20,21 @@ class DashboardServer extends EventEmitter {
     // the current state until it changes again.
     start() {
         this._wss = new WebSocketServer({ port: this._port });
-        this._wss.on('connection', (ws) => this.emit('connection', ws));
+        this._wss.on('connection', (ws) => {
+            this.emit('connection', ws);
+            // Dashboard -> agent controls (e.g. "lock spectator view to car
+            // X") — same { type, team, data } shape as outbound messages,
+            // just travelling the other way on the same socket.
+            ws.on('message', (raw) => {
+                let msg;
+                try {
+                    msg = JSON.parse(raw);
+                } catch {
+                    return;
+                }
+                if (msg?.type) this.emit('message', msg, ws);
+            });
+        });
     }
 
     // team is null for connection-status events that aren't team-specific.

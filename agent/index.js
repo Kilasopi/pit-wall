@@ -40,9 +40,59 @@ function getOrCreateTeam(teamId) {
             lastFuelEstimate: null,
             collectorConnected: false,
             iracingConnected: false,
+            incidents: [],
+            sessionKey: null,
+            lockedCarNumber: null,
+            displayName: null,
+            displayNameIsCustom: false,
         });
     }
     return teams.get(teamId);
+}
+
+// Identifies "this particular race" so incident history can be scoped to
+// it — an agent restart mid-race should still see this race's incidents,
+// but a restart between unrelated test sessions shouldn't drag in the
+// previous one's. TrackID/SessionID/SubSessionID are -1 for offline
+// practice/test sessions, so this collapses to one shared key for those;
+// real hosted races get a real per-session key.
+function sessionKeyFor(sessionInfo) {
+    const w = sessionInfo?.WeekendInfo;
+    if (!w) return null;
+    return `${w.TrackID ?? 'na'}:${w.SessionID ?? 'na'}:${w.SubSessionID ?? 'na'}`;
+}
+
+// Called whenever fresh session info comes in. If it's a different race
+// than the one this team's cache was tracking, the old in-memory incidents
+// no longer apply — reload from storage scoped to the new key (usually
+// empty, unless this is an agent restart mid-race reconnecting to the same
+// session).
+function applySessionKey(teamId, team, sessionInfo) {
+    const key = sessionKeyFor(sessionInfo);
+    if (!key || key === team.sessionKey) return;
+    team.sessionKey = key;
+    team.incidents = [];
+
+    if (!team.displayNameIsCustom) {
+        const trackName = sessionInfo?.WeekendInfo?.TrackDisplayName;
+        if (trackName && trackName !== team.displayName) {
+            team.displayName = trackName;
+            dashboard.broadcast('displayName', trackName, teamId);
+        }
+    }
+
+    if (storage) {
+        storage
+            .getIncidentsForSession(teamId, key)
+            .then((rows) => {
+                team.incidents = rows.map((r) => ({
+                    lap: r.lap,
+                    description: r.description,
+                    points: r.points,
+                }));
+            })
+            .catch((err) => console.error('Failed to load incident history:', err.message));
+    }
 }
 
 // Figures out which roster entry a connection belongs to by looking up the
@@ -148,10 +198,18 @@ async function handleLap(teamId, team, { lapsCompletedThisStint }) {
 
 async function handleIncident(teamId, { points, lap }) {
     const description = `${points}x incident${lap != null ? ` on lap ${lap}` : ''}`;
+    const team = getOrCreateTeam(teamId);
+    team.incidents.push({ lap, description, points });
     dashboard.broadcast('incident', { lap, description, points }, teamId);
 
     if (storage) {
-        await storage.insertIncident({ entryName: teamId, lap, description, points });
+        await storage.insertIncident({
+            entryName: teamId,
+            lap,
+            description,
+            points,
+            sessionKey: team.sessionKey,
+        });
     }
 }
 
@@ -163,8 +221,18 @@ server.on('collector-connected', (ws) => {
 server.on('collector-disconnected', (ws) => {
     const connState = connections.get(ws);
     if (connState?.teamId) {
-        getOrCreateTeam(connState.teamId).collectorConnected = false;
+        const team = getOrCreateTeam(connState.teamId);
+        team.collectorConnected = false;
         dashboard.broadcast('collector', false, connState.teamId);
+        // The collector app going away entirely means whatever iRacing
+        // session it was watching is gone too — otherwise this stays
+        // stale at whatever it last was (e.g. still "true" if the app was
+        // killed rather than closed gracefully), and the pitwall never
+        // disappears from the landing page for an abrupt disconnect.
+        if (team.iracingConnected) {
+            team.iracingConnected = false;
+            dashboard.broadcast('iracingSession', false, connState.teamId);
+        }
     }
     connections.delete(ws);
     console.log('Collector disconnected');
@@ -201,6 +269,7 @@ server.on('hello', ({ teamOverride }, ws) => {
     if (connState.latestSession) {
         team.strategyEngine.ingestSession(connState.latestSession);
         team.lastSession = connState.latestSession;
+        applySessionKey(teamOverride, team, connState.latestSession);
         dashboard.broadcast('session', connState.latestSession, teamOverride);
         handleTrackMap(teamOverride, connState.latestSession?.WeekendInfo?.TrackID);
     }
@@ -237,6 +306,40 @@ dashboard.on('connection', (ws) => {
                 teamId
             );
         }
+        if (team.incidents.length) {
+            dashboard.sendTo(ws, 'incidentsSnapshot', team.incidents, teamId);
+        }
+        if (team.lockedCarNumber != null) {
+            dashboard.sendTo(ws, 'lockedCar', team.lockedCarNumber, teamId);
+        }
+        if (team.displayName) {
+            dashboard.sendTo(ws, 'displayName', team.displayName, teamId);
+        }
+    }
+});
+
+// Dashboard -> agent controls.
+dashboard.on('message', (msg) => {
+    if (!msg.team) return;
+
+    if (msg.type === 'lockCar') {
+        // Spectator car-locking: pin the pitwall's data to a specific car
+        // regardless of where the iRacing spectator camera goes.
+        const team = getOrCreateTeam(msg.team);
+        team.lockedCarNumber = msg.data ?? null;
+        team.strategyEngine.setLockedCarNumber(team.lockedCarNumber);
+        dashboard.broadcast('lockedCar', team.lockedCarNumber, msg.team);
+    }
+
+    if (msg.type === 'renamePitwall') {
+        // Manual override of the auto-derived (track name) display label —
+        // teamId itself (e.g. "car-29") stays as-is since it's load-bearing
+        // for routing/DB scoping, this only changes what's shown for it.
+        const team = getOrCreateTeam(msg.team);
+        const name = typeof msg.data === 'string' ? msg.data.trim() : '';
+        team.displayName = name || null;
+        team.displayNameIsCustom = Boolean(name);
+        dashboard.broadcast('displayName', team.displayName, msg.team);
     }
 });
 
@@ -249,6 +352,7 @@ server.on('session', (data, ws) => {
         const team = getOrCreateTeam(connState.teamId);
         team.strategyEngine.ingestSession(data);
         team.lastSession = data;
+        applySessionKey(connState.teamId, team, data);
         dashboard.broadcast('session', data, connState.teamId);
         handleTrackMap(connState.teamId, data?.WeekendInfo?.TrackID);
     }
@@ -280,6 +384,7 @@ server.on('telemetry', (values, ws) => {
 
                     team.strategyEngine.ingestSession(connState.latestSession);
                     team.lastSession = connState.latestSession;
+                    applySessionKey(teamId, team, connState.latestSession);
                     dashboard.broadcast('session', connState.latestSession, teamId);
                     handleTrackMap(teamId, connState.latestSession?.WeekendInfo?.TrackID);
                 })

@@ -51,10 +51,19 @@ class StrategyEngine {
         this._currentCarNumber = null;
         this._currentCarName = null;
         this._lastSettings = null;
+        this._lockedCarNumber = null;
     }
 
     ingestSession(sessionInfo) {
         this._sessionInfo = sessionInfo;
+    }
+
+    // Pins currentDriver()/swap-detection to a specific car regardless of
+    // where the spectator camera goes — for a strategist watching other
+    // cars while keeping the pitwall's data on one chosen car. Pass null
+    // to go back to following the camera.
+    setLockedCarNumber(carNumber) {
+        this._lockedCarNumber = carNumber != null ? String(carNumber) : null;
     }
 
     // Returns an array of events for this telemetry tick, any of:
@@ -73,7 +82,12 @@ class StrategyEngine {
             this._lastDCDriversSoFar !== null &&
             values.DCDriversSoFar > this._lastDCDriversSoFar;
 
+        // Camera moves don't count as a swap while locked — that's the
+        // whole point of locking, the strategist can look elsewhere without
+        // the pitwall following. Instead, watch whether the locked car's
+        // own driver changed (a real swap in that car).
         const camCarChanged =
+            !this._lockedCarNumber &&
             !isFirstTick &&
             typeof values.CamCarIdx === 'number' &&
             this._lastCamCarIdx !== null &&
@@ -82,7 +96,12 @@ class StrategyEngine {
         if (typeof values.DCDriversSoFar === 'number') this._lastDCDriversSoFar = values.DCDriversSoFar;
         if (typeof values.CamCarIdx === 'number') this._lastCamCarIdx = values.CamCarIdx;
 
-        if (isFirstTick || dcDriversChanged || camCarChanged) {
+        const lockedDriverChanged =
+            !isFirstTick &&
+            this._lockedCarNumber != null &&
+            this._resolveCurrentDriver(values).driver !== this._currentDriver;
+
+        if (isFirstTick || dcDriversChanged || camCarChanged || lockedDriverChanged) {
             const { driver, carNumber, carName } = this._resolveCurrentDriver(values);
             this._currentDriver = driver;
             this._currentCarNumber = carNumber;
@@ -125,16 +144,24 @@ class StrategyEngine {
     }
 
     _resolveCurrentDriver(values) {
-        // CamCarIdx (whichever car the camera is on), not PlayerCarIdx
-        // (your own car slot as a session participant) — when spectating,
-        // those differ, and PlayerCarIdx never follows the camera to an
-        // AI car.
-        const carIdx = values.CamCarIdx;
         const drivers = this._sessionInfo?.DriverInfo?.Drivers;
-        const info =
-            Array.isArray(drivers) && typeof carIdx === 'number'
-                ? drivers.find((d) => d.CarIdx === carIdx)
+
+        let info = null;
+        if (this._lockedCarNumber != null) {
+            info = Array.isArray(drivers)
+                ? drivers.find((d) => String(d.CarNumber) === this._lockedCarNumber)
                 : null;
+        } else {
+            // CamCarIdx (whichever car the camera is on), not PlayerCarIdx
+            // (your own car slot as a session participant) — when
+            // spectating, those differ, and PlayerCarIdx never follows the
+            // camera to an AI car.
+            const carIdx = values.CamCarIdx;
+            info =
+                Array.isArray(drivers) && typeof carIdx === 'number'
+                    ? drivers.find((d) => d.CarIdx === carIdx)
+                    : null;
+        }
 
         return {
             driver: info?.UserName ?? 'Unknown driver',

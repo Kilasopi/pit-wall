@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { useRelaySocket } from '@/hooks/useRelaySocket';
+import { useTeamSlugs } from '@/hooks/useTeamSlugs';
 import { Badge } from '@/components/ui/badge';
 
 const links = [
@@ -12,13 +13,18 @@ const links = [
   { to: '/planner', label: 'Stint Planner' },
 ];
 
-// teamId is only present on /t/:teamId/* routes — on every other page this
-// is undefined, so the team-scoped badges (collector/iRacing session) just
-// read as disconnected since no collector has been resolved to "this" team.
+// teamId param is only present on /t/:teamId/* routes — on every other
+// page this is undefined, so the team-scoped badges (collector/iRacing
+// session) just read as disconnected since no collector has been resolved
+// to "this" team. The param itself is a friendly slug (see useTeamSlugs),
+// not the agent's real teamId, so it needs the same resolution RaceView
+// does before opening its own status socket.
 export function NavBar() {
   const { pathname } = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { teamId } = useParams();
+  const { teamId: slugParam } = useParams();
+  const { slugToTeamId } = useTeamSlugs();
+  const teamId = slugParam ? (slugToTeamId[slugParam] ?? slugParam) : undefined;
   const agent = useAgentSocket(teamId);
   const relay = useRelaySocket();
 

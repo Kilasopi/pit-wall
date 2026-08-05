@@ -78,14 +78,25 @@ function createStorage(databaseUrl) {
             );
         },
 
-        async insertIncident({ entryName, lap, description, points }) {
+        async insertIncident({ entryName, lap, description, points, sessionKey }) {
             const { rows } = await pool.query(
-                `INSERT INTO incidents (entry_name, lap, description, points)
-                 VALUES ($1, $2, $3, $4)
+                `INSERT INTO incidents (entry_name, lap, description, points, session_key)
+                 VALUES ($1, $2, $3, $4, $5)
                  RETURNING id, logged_at`,
-                [entryName ?? null, lap ?? null, description, points]
+                [entryName ?? null, lap ?? null, description, points, sessionKey ?? null]
             );
             return rows[0];
+        },
+
+        async getIncidentsForSession(entryName, sessionKey) {
+            const { rows } = await pool.query(
+                `SELECT lap, description, points
+                 FROM incidents
+                 WHERE entry_name = $1 AND session_key = $2
+                 ORDER BY logged_at ASC`,
+                [entryName, sessionKey]
+            );
+            return rows;
         },
 
         async close() {

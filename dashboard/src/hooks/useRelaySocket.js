@@ -22,6 +22,8 @@ function reducer(state, event) {
       return { ...state, fuel: event.data };
     case 'incident':
       return { ...state, incidents: [event.data, ...state.incidents] };
+    case 'incidentsSnapshot':
+      return { ...state, incidents: [...event.data].reverse() };
     default:
       return state;
   }

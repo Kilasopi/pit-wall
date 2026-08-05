@@ -14,6 +14,8 @@ const initialState = {
   trackMap: null,
   collectorConnected: false,
   inIracingSession: false,
+  lockedCarNumber: null,
+  displayName: null,
 };
 
 function reducer(state, event) {
@@ -30,6 +32,8 @@ function reducer(state, event) {
       return { ...state, fuel: event.data };
     case 'incident':
       return { ...state, incidents: [event.data, ...state.incidents] };
+    case 'incidentsSnapshot':
+      return { ...state, incidents: [...event.data].reverse() };
     case 'stintClosed':
       return { ...state, stintHistory: [event.data, ...state.stintHistory] };
     case 'telemetry':
@@ -42,6 +46,10 @@ function reducer(state, event) {
       return { ...state, collectorConnected: event.data };
     case 'iracingSession':
       return { ...state, inIracingSession: event.data };
+    case 'lockedCar':
+      return { ...state, lockedCarNumber: event.data };
+    case 'displayName':
+      return { ...state, displayName: event.data };
 
     default:
       return state;
@@ -59,6 +67,7 @@ export function useAgentSocket(teamId) {
   dispatchRef.current = dispatch;
   const teamIdRef = useRef(teamId);
   teamIdRef.current = teamId;
+  const wsRef = useRef(null);
 
   useEffect(() => {
     dispatchRef.current({ type: 'reset' });
@@ -71,6 +80,7 @@ export function useAgentSocket(teamId) {
 
     function connect() {
       ws = new WebSocket(AGENT_DASHBOARD_WS_URL);
+      wsRef.current = ws;
 
       ws.onopen = () => dispatchRef.current({ type: 'connected' });
 
@@ -105,5 +115,22 @@ export function useAgentSocket(teamId) {
     };
   }, []);
 
-  return state;
+  // carNumber: null to unlock and go back to following the camera.
+  function lockCar(carNumber) {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN && teamIdRef.current) {
+      ws.send(JSON.stringify({ type: 'lockCar', team: teamIdRef.current, data: carNumber }));
+    }
+  }
+
+  // name: falsy/empty to clear the override and go back to the
+  // auto-derived (track name) label.
+  function renamePitwall(name) {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN && teamIdRef.current) {
+      ws.send(JSON.stringify({ type: 'renamePitwall', team: teamIdRef.current, data: name }));
+    }
+  }
+
+  return { ...state, lockCar, renamePitwall };
 }
