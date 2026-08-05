@@ -58,7 +58,15 @@ class IracingReader extends EventEmitter {
     _tick() {
         if (!this._polling) return;
 
-        const sessionOk = this._sdk.sessionStatusOK || this._sdk.startSDK();
+        // sessionStatusOK is the live truth — startSDK() is only for
+        // (re)attaching to the shared-memory segment when not currently
+        // connected. Its own return value used to double as the "are we
+        // connected" signal too, but that segment can apparently stay
+        // attachable even after leaving a session (stale/leftover
+        // mapping), which meant this never reliably flipped back to
+        // disconnected. Always trust sessionStatusOK for the actual state.
+        if (!this._sdk.sessionStatusOK) this._sdk.startSDK();
+        const sessionOk = this._sdk.sessionStatusOK;
         if (sessionOk !== this._lastSessionOk) {
             this._lastSessionOk = sessionOk;
             this.emit(sessionOk ? 'connected' : 'disconnected');
