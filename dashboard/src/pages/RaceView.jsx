@@ -11,6 +11,7 @@ import Leaderboard from './RaceView-Pages/Leaderboard.jsx';
 import CarInfo from './RaceView-Pages/CarInfo.jsx';
 import TrackInfo from './RaceView-Pages/TrackInfo.jsx';
 import Strategy from './RaceView-Pages/Strategy.jsx';
+import Spectate from './RaceView-Pages/Spectate.jsx'
 
 // Owns the one live WebSocket connection for this whole section — Pit
 // Wall/Car Info/Track Info all read it via props instead of each calling
@@ -84,6 +85,7 @@ function RaceView() {
         <Route path="carinfo" element={<CarInfo {...agent} />} />
         <Route path="trackinfo" element={<TrackInfo {...agent} />} />
         <Route path="strategy" element={<Strategy {...agent} />} />
+        <Route path="spectate" element={<Spectate {...agent} />} />
       </Routes>
     </div>
   );
