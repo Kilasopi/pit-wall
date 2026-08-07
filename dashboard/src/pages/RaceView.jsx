@@ -78,6 +78,7 @@ function RaceView() {
         <>
           <div className="mb-2 flex items-center justify-between">
             <PitwallTitle
+              usage="Racing"
               teamId={teamId}
               displayName={agent.displayName}
               renamePitwall={agent.renamePitwall}

@@ -7,7 +7,11 @@ import Spectate from './Spectate.jsx';
 // (sorted so multiple viewers land on the same one deterministically);
 // with none live, Spectate still renders and shows its own placeholders.
 function SpectateRoot() {
-  return <Spectate />;
+  const { liveTeams } = useTeamSlugs();
+  const teamId = Object.keys(liveTeams).sort()[0];
+  const agent = useAgentSocket(teamId);
+
+  return <Spectate {...agent} />;
 }
 
 export default SpectateRoot;

@@ -181,8 +181,8 @@ export function TrackMapCard({ trackMap, telemetry, session, lockedCarNumber }) 
             fill="none"
             stroke="currentColor"
             className="text-muted-foreground"
-            strokeWidth={strokeWidth}
-            strokeDasharray={isRealMap ? undefined : strokeWidth}
+            strokeWidth={isRealMap ? strokeWidth : strokeWidth * 0.6}
+            strokeDasharray={isRealMap ? undefined : `${strokeWidth * 0.5} ${strokeWidth}`}
             strokeLinecap="round"
             strokeLinejoin="round"
           />

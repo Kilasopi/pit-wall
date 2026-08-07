@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 // The teamId (e.g. "car-29") stays the actual routing/DB identity — this
 // is just the human-facing label, defaulting to the track name (set
 // agent-side) until renamed here.
-export function PitwallTitle({ teamId, displayName, renamePitwall }) {
+export function PitwallTitle({ usage, teamId, displayName, renamePitwall }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -14,7 +14,7 @@ export function PitwallTitle({ teamId, displayName, renamePitwall }) {
   if (!editing) {
     return (
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-heading font-medium">Pit Wall — {label}</h1>
+        <h1 className="text-xl font-heading font-medium">{usage} — Pit Wall — {label}</h1>
         <button
           type="button"
           onClick={() => {
