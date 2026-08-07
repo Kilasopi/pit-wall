@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { useTeamSlugs } from '@/hooks/useTeamSlugs';
+import { isSpectateHost } from '@/lib/host';
 import { NavBar } from '@/components/NavBar';
 import { RaceViewNav } from '@/components/RaceViewNav';
 import { ThresholdAlertBanner } from '@/components/ThresholdAlertBanner';
@@ -11,7 +12,7 @@ import Leaderboard from './RaceView-Pages/Leaderboard.jsx';
 import CarInfo from './RaceView-Pages/CarInfo.jsx';
 import TrackInfo from './RaceView-Pages/TrackInfo.jsx';
 import Strategy from './RaceView-Pages/Strategy.jsx';
-import Spectate from './RaceView-Pages/Spectate.jsx'
+import Spectate from './Spectate.jsx'
 
 // Owns the one live WebSocket connection for this whole section — Pit
 // Wall/Car Info/Track Info all read it via props instead of each calling
@@ -65,28 +66,50 @@ function RaceView() {
 
   if (!slugParam) return <Navigate to="/" replace />;
 
+  // Crew pages (Pit Wall, Leaderboard, strategy, etc.) live only on
+  // pitwall.murder-pitwall.com; the family-facing Spectate page only on
+  // spectate.murder-pitwall.com — each hostname redirects a stray path on
+  // the other into its one allowed page rather than exposing both.
+  const spectateHost = isSpectateHost();
+
   return (
     <div className="min-h-screen bg-background p-6 text-foreground">
-      <div className="mb-2 flex items-center justify-between">
-        <PitwallTitle
-          teamId={teamId}
-          displayName={agent.displayName}
-          renamePitwall={agent.renamePitwall}
-        />
-      </div>
+      {!spectateHost && (
+        <>
+          <div className="mb-2 flex items-center justify-between">
+            <PitwallTitle
+              teamId={teamId}
+              displayName={agent.displayName}
+              renamePitwall={agent.renamePitwall}
+            />
+          </div>
+          <NavBar />
+          <RaceViewNav teamId={slugParam} />
+          <ThresholdAlertBanner fuel={agent.fuel} />
+        </>
+      )}
 
-      <NavBar />
-      <RaceViewNav teamId={slugParam} />
-      <ThresholdAlertBanner fuel={agent.fuel} />
-
-      <Routes>
-        <Route index element={<PitWall {...agent} />} />
-        <Route path="leaderboard" element={<Leaderboard {...agent} />} />
-        <Route path="carinfo" element={<CarInfo {...agent} />} />
-        <Route path="trackinfo" element={<TrackInfo {...agent} />} />
-        <Route path="strategy" element={<Strategy {...agent} />} />
-        <Route path="spectate" element={<Spectate {...agent} />} />
-      </Routes>
+      {spectateHost ? (
+        <Routes>
+          <Route path="spectate" element={<Spectate {...agent} />} />
+          <Route
+            path="*"
+            element={<Navigate to={`/t/${encodeURIComponent(slugParam)}/spectate`} replace />}
+          />
+        </Routes>
+      ) : (
+        <Routes>
+          <Route index element={<PitWall {...agent} />} />
+          <Route path="leaderboard" element={<Leaderboard {...agent} />} />
+          <Route path="carinfo" element={<CarInfo {...agent} />} />
+          <Route path="trackinfo" element={<TrackInfo {...agent} />} />
+          <Route path="strategy" element={<Strategy {...agent} />} />
+          <Route
+            path="spectate"
+            element={<Navigate to={`/t/${encodeURIComponent(slugParam)}`} replace />}
+          />
+        </Routes>
+      )}
     </div>
   );
 }

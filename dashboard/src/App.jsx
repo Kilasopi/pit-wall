@@ -1,18 +1,34 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import RaceView from './pages/RaceView.jsx'
 import TeamSelectPage from './pages/TeamSelectPage.jsx'
+import SpectateRoot from './pages/SpectateRoot.jsx'
 import DriversPage from './pages/DriversPage.jsx'
 import StintPlannerPage from './pages/StintPlannerPage.jsx'
 import ThemePreview from './pages/ThemePreview.jsx'
+import { isSpectateHost } from './lib/host.js'
 
 function App() {
+  // Crew-only pages (roster management, stint planning) have no reason
+  // to exist on the family-facing spectate.murder-pitwall.com hostname —
+  // see RaceView.jsx for the equivalent split on the /t/:teamId/* pages.
+  const spectateHost = isSpectateHost()
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<TeamSelectPage />} />
+        <Route path="/" element={spectateHost ? <SpectateRoot /> : <TeamSelectPage />} />
         <Route path="/t/:teamId/*" element={<RaceView />} />
-        <Route path="/drivers" element={<DriversPage />} />
-        <Route path="/planner" element={<StintPlannerPage />} />
+        {spectateHost ? (
+          <>
+            <Route path="/drivers" element={<Navigate to="/" replace />} />
+            <Route path="/planner" element={<Navigate to="/" replace />} />
+          </>
+        ) : (
+          <>
+            <Route path="/drivers" element={<DriversPage />} />
+            <Route path="/planner" element={<StintPlannerPage />} />
+          </>
+        )}
         {import.meta.env.DEV && (
           <Route path="/theme-preview" element={<ThemePreview />} />
         )}

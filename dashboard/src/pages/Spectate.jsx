@@ -1,5 +1,8 @@
 import { formatTimeRemaining, convertSkies } from '@/hooks/convertTrackInfoData';
 
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from '@/hooks/useTheme';
+
 import {
     Card,
     CardHeader,
@@ -14,6 +17,8 @@ import {
 // Main audience: Family and friends who want to watch along
 
 function Spectate({ session, telemetry, stint }) {
+
+    const { theme, toggleTheme } = useTheme();
     
     // Find the car ID for Team MURDER
     const drivers = session?.DriverInfo?.Drivers ?? [];
@@ -57,42 +62,55 @@ function Spectate({ session, telemetry, stint }) {
     const carNumber = stint?.carNumber;
     const driverLapsStint = stint?.lapsCompleted; // Laps done this stint by driver
     const driverTotalLaps = stint?.totalLapsCompleted; // Total laps driver individual
-    return (
-        <div className='grid grid-cols-2'>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Track Info</CardTitle>
-                    <CardDescription>Info about the race event</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <dl>
-                        <dt>Track Name</dt>
-                        <dd>{trackName}</dd>
-                        <dt>Track Length</dt>
-                        <dd>{trackLength}</dd>
-                        <dt>Number of Turns</dt>
-                        <dd>{trackNumTurns}</dd>
-                        <dt>Country</dt>
-                        <dd>{trackCountry}</dd>
-                        <dt>Track Location</dt>
-                        <dd>{trackCity}{trackState ?  `, ${trackState}` : ``}</dd>
-                    </dl>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Weather</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <dl>
-                        <dt>Conditions</dt>
-                        <dd>{skies}</dd>
-                        <dt>Air Temp | Track Temp</dt>
-                        <dd>{airTemp} | {trackTemp}</dd>
-                        <dt>Wind Info</dt>
-                    </dl>
-                </CardContent>
-            </Card>
+    return(
+        <div>
+            <div>
+                <button
+                    type="button"
+                    onClick={toggleTheme}
+                    aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                    {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                </button>
+            </div>
+        
+            <div className='grid grid-cols-2'>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Track Info</CardTitle>
+                        <CardDescription>Info about the race event</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <dl>
+                            <dt>Track Name</dt>
+                            <dd>{trackName}</dd>
+                            <dt>Track Length</dt>
+                            <dd>{trackLength}</dd>
+                            <dt>Number of Turns</dt>
+                            <dd>{trackNumTurns}</dd>
+                            <dt>Country</dt>
+                            <dd>{trackCountry}</dd>
+                            <dt>Track Location</dt>
+                            <dd>{trackCity}{trackState ?  `, ${trackState}` : ``}</dd>
+                        </dl>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Weather</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <dl>
+                            <dt>Conditions</dt>
+                            <dd>{skies}</dd>
+                            <dt>Air Temp | Track Temp</dt>
+                            <dd>{airTemp} | {trackTemp}</dd>
+                            <dt>Wind Info</dt>
+                        </dl>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }

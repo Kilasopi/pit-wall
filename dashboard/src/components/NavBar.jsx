@@ -7,6 +7,8 @@ import { useRelaySocket } from '@/hooks/useRelaySocket';
 import { useTeamSlugs } from '@/hooks/useTeamSlugs';
 import { Badge } from '@/components/ui/badge';
 
+// Only ever rendered on the crew (pitwall) host — the spectate host
+// renders SpectateRoot/Spectate.jsx directly with no nav chrome at all.
 const links = [
   { to: '/', label: 'Race View' },
   { to: '/drivers', label: 'Drivers' },

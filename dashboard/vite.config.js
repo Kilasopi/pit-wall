@@ -87,7 +87,7 @@ export default defineConfig({
     // Vite's Host-header check otherwise rejects any hostname it doesn't
     // recognize. *.trycloudflare.com covers the free quick-tunnel fallback;
     // the named-tunnel hostname is the real one in day-to-day use.
-    allowedHosts: ['.trycloudflare.com', 'pitwall.murder-pitwall.com'],
+    allowedHosts: ['.trycloudflare.com', 'pitwall.murder-pitwall.com', 'spectate.murder-pitwall.com'],
 
     // Proxies relay's REST API and the agent's dashboard broadcast through
     // this same origin/port, so the whole app works behind a single tunneled
