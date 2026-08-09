@@ -132,10 +132,12 @@ async function handleTrackMap(teamId, trackId) {
     try {
         console.log(`Fetching track map for trackId ${trackId} (team ${teamId})...`);
         const svgPath = await trackMapService.getTrackPath(trackId);
+        const { direction, offset } = await trackMapService.getTrackSettings(trackId);
         if (svgPath) {
             console.log(`Track map fetched for trackId ${trackId} (${svgPath.length} chars)`);
+            console.log(`Track settings fetched for trackId ${trackId}`);
             team.lastTrackMapPath = svgPath;
-            dashboard.broadcast('trackmap', { trackId, path: svgPath }, teamId);
+            dashboard.broadcast('trackmap', { trackId, path: svgPath, direction: direction, offset: offset }, teamId);
         } else {
             console.log(`No track map asset found for trackId ${trackId}`);
         }

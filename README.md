@@ -74,11 +74,22 @@ mid-stint.
 
 ### Track map caveat
 
-The real track outline comes from iRacing's Data API (`track/assets`), which
-requires an OAuth client registration. **iRacing has currently paused issuing
-new OAuth client IDs**, so until that reopens the track map falls back to a
-generic stadium-shaped outline — car positions (via `CarIdxLapDistPct`) are
-still live and accurate, just not plotted on the real track shape.
+The real track outline comes from a bundled dataset
+(`agent/data/track_info.json`, `agent/data/track_settings.json`) rather than
+iRacing's own Data API — that API's `track/assets` endpoint requires an
+OAuth client registration, and **iRacing has currently paused issuing new
+OAuth client IDs**, so it isn't usable right now (see
+`agent/track_map_service.js` for the full explanation). The bundled dataset
+covers 424 tracks/configs as of when it was pulled; any track missing from
+it falls back to a generic stadium-shaped outline — car positions (via
+`CarIdxLapDistPct`) are still live and accurate either way, just not plotted
+on the real shape for an uncovered track. Once iRacing reopens OAuth
+registration, the Data API becomes the better long-term source (always
+current, no bundled-file staleness) and can replace this.
+
+Track shape/settings data is from
+[iRaceHUD](https://github.com/xikxp1/iRaceHUD) (GPLv3) — see
+`agent/data/LICENSE` for the full license text.
 
 ## Architecture
 

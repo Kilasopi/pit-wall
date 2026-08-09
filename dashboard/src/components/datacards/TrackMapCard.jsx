@@ -7,7 +7,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card';
-import { classColorToCss, getSessionClasses } from '@/hooks/convertLeaderboardData';
+import { classColorToCss } from '@/hooks/convertLeaderboardData';
 import { useSectionCautionState, getSectionBoundaries } from '@/hooks/convertTrackInfoData';
 
 // Plain horizontal-line stand-in for tracks we don't have a real outline
@@ -20,9 +20,8 @@ const GENERIC_HEIGHT = 40;
 const GENERIC_TRACK_PATH = `M 0 ${GENERIC_HEIGHT / 2} H ${GENERIC_WIDTH}`;
 
 // Samples the path just before/after `pct` to get a tangent, then rotates
-// it 90° for the perpendicular ("normal") direction at that point — used
-// both to spread multi-class fields into side-by-side lanes and to draw
-// section-boundary tick marks across the track rather than along it.
+// it 90° for the perpendicular ("normal") direction at that point — used to
+// draw section-boundary tick marks across the track rather than along it.
 function getPointAndNormal(pathEl, pathLength, pct) {
   const t = (((pct % 1) + 1) % 1) * pathLength;
   const epsilon = Math.max(pathLength * 0.001, 0.5);
@@ -66,13 +65,6 @@ export function TrackMapCard({ trackMap, telemetry, session, lockedCarNumber }) 
   const carIdxLap = telemetry?.CarIdxLap;
   const trackSurface = telemetry?.CarIdxTrackSurface;
 
-  // Multi-class fields plotted on the same lap-distance pct would all sit
-  // stacked on top of each other at any given point — offsetting each
-  // class into its own lane perpendicular to the track, centered around
-  // the actual line, keeps every class visible at once.
-  const classes = getSessionClasses(drivers);
-  const classLaneIndex = new Map(classes.map((cls, i) => [cls.id, i]));
-
   const cars = drivers
     .filter((driver) => !driver.CarIsPaceCar && !driver.IsSpectator)
     .map((driver) => {
@@ -90,7 +82,6 @@ export function TrackMapCard({ trackMap, telemetry, session, lockedCarNumber }) 
         trackDistance: typeof lap === 'number' && lap >= 0 && pct != null ? lap + pct : null,
         onTrack: surface != null && surface !== -1,
         classColor: classColorToCss(driver.CarClassColor),
-        laneIndex: classLaneIndex.get(driver.CarClassID) ?? 0,
       };
     })
     .filter((car) => car.onTrack && car.pct != null && car.pct >= 0);
@@ -118,18 +109,21 @@ export function TrackMapCard({ trackMap, telemetry, session, lockedCarNumber }) 
   }
 
   const strokeWidth = bounds ? Math.max(bounds.width, bounds.height) * 0.012 : 20;
-  const carRadius = bounds ? Math.max(bounds.width, bounds.height) * 0.008 : 14;
-  const laneGap = carRadius * 2.4;
-  // Wide enough to fit the outermost class lane plus the tick marks,
-  // whichever pushes further out from the plain track outline.
-  const margin = strokeWidth * 2 + laneGap * classes.length + carRadius * 2;
+  // Noticeably bigger than the track line itself (diameter > strokeWidth),
+  // so dots read clearly against the outline rather than blending into it.
+  const carRadius = strokeWidth * 0.7;
+  // Wide enough to fit the tick marks pushing out from the plain outline.
+  const margin = strokeWidth * 2 + carRadius * 2;
+
+  const direction = trackMap?.direction ?? 1;
+  const offset = trackMap?.offset ?? 0;
 
   const points =
     pathLength && pathRef.current
       ? cars.map((car) => {
-          const { point, normal } = getPointAndNormal(pathRef.current, pathLength, car.pct);
-          const offset = classes.length > 1 ? (car.laneIndex - (classes.length - 1) / 2) * laneGap : 0;
-          return { ...car, x: point.x + normal.x * offset, y: point.y + normal.y * offset };
+          const pathPct = offset + direction * car.pct;
+          const { point } = getPointAndNormal(pathRef.current, pathLength, pathPct);
+          return { ...car, x: point.x, y: point.y };
         })
       : [];
 
