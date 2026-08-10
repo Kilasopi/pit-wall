@@ -5,6 +5,8 @@ const cheerio = require('cheerio');
 const { WebSocketServer } = require('ws');
 const { Pool } = require('pg');
 
+const { fetchScheduleEvents } = require('./iRacingScheduleScraper.js');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -255,6 +257,80 @@ app.delete('/api/murder-drivers/:id', async (req, res) => {
         }
         throw err;
     }
+});
+
+// =======
+// iRacing Regular Schedule (scraped from iRacing PDF)
+// =======
+
+async function saveScheduleEvents(results) {
+    for (const series of results) {
+        const { rows } = await pool.query(
+            `INSERT INTO race_series (name, source, car_classes)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (source, name)
+             DO UPDATE SET car_classes = EXCLUDED.car_classes
+             RETURNING id`,
+            [series.name, series.source, series.carClasses ?? null]
+        );
+        const raceSeriesId = rows[0].id;
+
+        for (const event of series.events) {
+            const { rows } = await pool.query(
+                `INSERT INTO race_events (name, track, race_series_id, week, length_minutes)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (race_series_id, week)
+                DO UPDATE SET track = EXCLUDED.track, length_minutes = EXCLUDED.length_minutes
+                RETURNING id`,
+                [`${series.name} - Week ${event.week}`, event.track, raceSeriesId, event.week, event.lengthMinutes]
+            );
+            const raceEventId = rows[0].id;
+
+            for (const timeslot of event.timeslots) {
+                await pool.query(
+                    `INSERT INTO race_event_timeslots (race_event_id, start_at)
+                    VALUES ($1, $2)
+                    ON CONFLICT (race_event_id, start_at) DO NOTHING`,
+                    [raceEventId, timeslot]
+                );
+            }
+        }
+    }
+}
+
+const SCHEDULE_REFRESH_MS = 6 * 60 * 60 * 1000; // every 6 hours
+
+async function refreshSchedule() {
+    try {
+        const results = await fetchScheduleEvents();
+        await saveScheduleEvents(results);
+        console.log(`Schedule refreshed: ${results.length} series`);
+    } catch (err) {
+        console.error('Failed to refresh schedule:', err.message);
+    }
+}
+
+refreshSchedule();
+setInterval(refreshSchedule, SCHEDULE_REFRESH_MS);
+
+app.get('/api/race-events', async (req, res) => {
+    const { rows: series } = await pool.query('SELECT * FROM race_series');
+    const { rows: events } = await pool.query('SELECT * FROM race_events');
+    const { rows: timeslots } = await pool.query('SELECT * FROM race_event_timeslots ORDER BY start_at');
+
+    const result = series.map((s) => ({
+        ...s,
+        events: events
+            .filter((e) => e.race_series_id === s.id)
+            .map((e) => ({
+                ...e,
+                timeslots: timeslots
+                    .filter((t) => t.race_event_id === e.id)
+                    .map((t) => t.start_at),
+            })),
+    }));
+
+    res.json(result);
 });
 
 // =======

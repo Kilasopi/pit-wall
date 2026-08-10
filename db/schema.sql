@@ -75,17 +75,27 @@ CREATE TABLE entry_drivers (
     CHECK (num_nonnulls(driver_id, guest_name) = 1)
 );
 
-CREATE TABLE race_events (
+CREATE TABLE race_series (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    track TEXT,
     source TEXT NOT NULL CHECK (source IN ('special_event', 'schedule_pdf', 'manual')),
     car_classes TEXT[],
     UNIQUE (source, name)
 );
 
+CREATE TABLE race_events (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    track TEXT,
+    race_series_id INT REFERENCES race_series(id) ON DELETE CASCADE,
+    week INT,
+    length_minutes INT,
+    UNIQUE (race_series_id, week)
+);
+
 CREATE TABLE race_event_timeslots (
     id SERIAL PRIMARY KEY,
     race_event_id INT NOT NULL REFERENCES race_events(id) ON DELETE CASCADE,
-    start_at TIMESTAMPTZ NOT NULL
+    start_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT race_event_timeslots_event_start_key UNIQUE (race_event_id, start_at)
 );
