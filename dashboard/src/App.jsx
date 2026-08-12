@@ -6,6 +6,8 @@ import DriversPage from './pages/DriversPage.jsx'
 import StintPlannerPage from './pages/StintPlannerPage.jsx'
 import ThemePreview from './pages/ThemePreview.jsx'
 import { isSpectateHost } from './lib/host.js'
+import Schedule from './pages/Schedule.jsx';
+
 
 function App() {
   // Crew-only pages (roster management, stint planning) have no reason
@@ -22,11 +24,14 @@ function App() {
           <>
             <Route path="/drivers" element={<Navigate to="/" replace />} />
             <Route path="/planner" element={<Navigate to="/" replace />} />
+            <Route path="/schedule" element={<Navigate to="/" replace />} />
+            
           </>
         ) : (
           <>
             <Route path="/drivers" element={<DriversPage />} />
             <Route path="/planner" element={<StintPlannerPage />} />
+            <Route path="/schedule" element={<Schedule />} />
           </>
         )}
         {import.meta.env.DEV && (

@@ -63,20 +63,23 @@ function extractWeeks(block, series) {
         return block.slice(startIndex, endIndex);
     });
 
-    weekBlocks.forEach((weekBlock,i) => {
-        const weeksLine = weekBlock[0].match(/^Week (\d+) \((\d{4}-\d{2}-\d{2})\) (.+)$/);
+    weekBlocks.forEach((weekBlock, i) => {
+        let headerLine = weekBlock[0];
+        if (isWrappedTitleContinuation(weekBlock[1])) {
+            headerLine += " " + weekBlock[1].trim();
+        }
+        const weeksLine = headerLine.match(/^Week (\d+) \((\d{4}-\d{2}-\d{2})\) (.+)$/);
         if (weeksLine) {
             const durations = extractDuration(weekBlock);
             weeks.push({
                 series,
                 week: Number(weeksLine[1]),
-                anchorDate:weeksLine[2],
-                track:weeksLine[3],
+                anchorDate: weeksLine[2],
+                track: weeksLine[3],
                 lengthMinutes: durations[0]
             });
         }
     });
-
     return weeks;
 }
 
@@ -99,6 +102,10 @@ function buildTimeStamp(date, timeString) {
     const timestamp = new Date(date);
     timestamp.setUTCHours(hours, minutes || 0, 0, 0);
     return timestamp;
+}
+
+function isWrappedTitleContinuation(line) {
+    return line !== undefined && !line.trim().startsWith("(");
 }
 
 async function fetchScheduleEvents() {

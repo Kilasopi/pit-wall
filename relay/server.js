@@ -315,7 +315,7 @@ setInterval(refreshSchedule, SCHEDULE_REFRESH_MS);
 
 app.get('/api/race-events', async (req, res) => {
     const { rows: series } = await pool.query('SELECT * FROM race_series');
-    const { rows: events } = await pool.query('SELECT * FROM race_events');
+    const { rows: events } = await pool.query('SELECT * FROM race_events ORDER BY race_series_id, week');
     const { rows: timeslots } = await pool.query('SELECT * FROM race_event_timeslots ORDER BY start_at');
 
     const result = series.map((s) => ({

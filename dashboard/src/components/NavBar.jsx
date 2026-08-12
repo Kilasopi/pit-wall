@@ -13,6 +13,7 @@ const links = [
   { to: '/', label: 'Race View' },
   { to: '/drivers', label: 'Drivers' },
   { to: '/planner', label: 'Stint Planner' },
+  { to: '/schedule', label: 'Schedule' },
 ];
 
 // teamId param is only present on /t/:teamId/* routes — on every other
