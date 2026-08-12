@@ -6,6 +6,7 @@ const { WebSocketServer } = require('ws');
 const { Pool } = require('pg');
 
 const { fetchScheduleEvents } = require('./iRacingScheduleScraper.js');
+const { fetchSpecialEvents } = require('./specialEventsScraper.js');
 
 const app = express();
 app.use(cors());
@@ -334,38 +335,11 @@ app.get('/api/race-events', async (req, res) => {
 });
 
 // =======
-// Special events (scraped from iracing.com, cached for an hour)
+// iRacing Special Events (scraped from iRacing HTML)
 // =======
 
-const SPECIAL_EVENTS_URL = 'https://www.iracing.com/special-events/';
 const SPECIAL_EVENTS_CACHE_MS = 60 * 60 * 1000;
 let specialEventsCache = { fetchedAt: 0, events: [] };
-
-async function fetchSpecialEvents() {
-    const res = await fetch(SPECIAL_EVENTS_URL, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    const html = await res.text();
-
-    // The page lists upcoming events first, then a "Completed Events" heading
-    // followed by past events. Truncate there so only upcoming events remain,
-    // and keep document order since the page already lists them chronologically.
-    const completedIdx = html.indexOf('id="completed-events"');
-    const upcomingHtml = completedIdx === -1 ? html : html.slice(0, completedIdx);
-
-    const $ = cheerio.load(upcomingHtml);
-    const names = [];
-    const seen = new Set();
-    $('section.wp-block-cover[id]').each((_, section) => {
-        const name = $(section).find('h2.wp-block-heading').first().text().trim();
-        if (name && !seen.has(name)) {
-            seen.add(name);
-            names.push(name);
-        }
-    });
-    return names;
-}
 
 app.get('/api/special-events', async (req, res) => {
     const isStale = Date.now() - specialEventsCache.fetchedAt > SPECIAL_EVENTS_CACHE_MS;
@@ -374,7 +348,6 @@ app.get('/api/special-events', async (req, res) => {
         try {
             specialEventsCache = { fetchedAt: Date.now(), events: await fetchSpecialEvents() };
         } catch (err) {
-            // serve stale cache (or empty list) rather than fail the request
             console.error('Failed to refresh special events:', err.message);
         }
     }
