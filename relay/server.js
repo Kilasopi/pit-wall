@@ -315,7 +315,7 @@ refreshSchedule();
 setInterval(refreshSchedule, SCHEDULE_REFRESH_MS);
 
 app.get('/api/race-events', async (req, res) => {
-    const { rows: series } = await pool.query('SELECT * FROM race_series');
+    const { rows: series } = await pool.query("SELECT * FROM race_series WHERE source = 'schedule_pdf'");
     const { rows: events } = await pool.query('SELECT * FROM race_events ORDER BY race_series_id, week');
     const { rows: timeslots } = await pool.query('SELECT * FROM race_event_timeslots ORDER BY start_at');
 
@@ -338,19 +338,132 @@ app.get('/api/race-events', async (req, res) => {
 // iRacing Special Events (scraped from iRacing HTML)
 // =======
 
-const SPECIAL_EVENTS_CACHE_MS = 60 * 60 * 1000;
-let specialEventsCache = { fetchedAt: 0, events: [] };
+// Special events reuse race_series/race_events like the regular schedule,
+// but each special event is its own one-off "series" with a single
+// race_events row (week is fixed at 1) rather than a multi-week season.
+async function saveSpecialEvents(results) {
+    for (const event of results) {
+        const { rows } = await pool.query(
+            `INSERT INTO race_series (name, source, car_classes)
+             VALUES ($1, 'special_event', $2)
+             ON CONFLICT (source, name)
+             DO UPDATE SET car_classes = EXCLUDED.car_classes
+             RETURNING id`,
+            [event.name, event.carClasses ?? null]
+        );
+        const raceSeriesId = rows[0].id;
 
-app.get('/api/special-events', async (req, res) => {
-    const isStale = Date.now() - specialEventsCache.fetchedAt > SPECIAL_EVENTS_CACHE_MS;
+        const { rows: eventRows } = await pool.query(
+            `INSERT INTO race_events (name, race_series_id, week, length_minutes, distance_km, event_start_date, event_end_date)
+             VALUES ($1, $2, 1, $3, $4, $5, $6)
+             ON CONFLICT (race_series_id, week)
+             DO UPDATE SET length_minutes = EXCLUDED.length_minutes, distance_km = EXCLUDED.distance_km,
+                event_start_date = EXCLUDED.event_start_date, event_end_date = EXCLUDED.event_end_date
+             RETURNING id`,
+            [event.name, raceSeriesId, event.lengthMinutes, event.distanceKm, event.dateRange?.start ?? null, event.dateRange?.end ?? null]
+        );
+        const raceEventId = eventRows[0].id;
 
-    if (isStale) {
-        try {
-            specialEventsCache = { fetchedAt: Date.now(), events: await fetchSpecialEvents() };
-        } catch (err) {
-            console.error('Failed to refresh special events:', err.message);
+        for (const timeslot of event.timeslots) {
+            await pool.query(
+                `INSERT INTO race_event_timeslots (race_event_id, start_at)
+                VALUES ($1, $2)
+                ON CONFLICT (race_event_id, start_at) DO NOTHING`,
+                [raceEventId, timeslot]
+            );
         }
     }
+}
 
-    res.json(specialEventsCache.events);
+async function refreshSpecialEvents() {
+    try {
+        const results = await fetchSpecialEvents();
+        await saveSpecialEvents(results);
+        console.log(`Special events refreshed: ${results.length} events`);
+    } catch (err) {
+        console.error('Failed to refresh special events:', err.message);
+    }
+}
+
+const SPECIAL_EVENTS_REFRESH_MS = 60 * 60 * 1000; // every hour
+
+refreshSpecialEvents();
+setInterval(refreshSpecialEvents, SPECIAL_EVENTS_REFRESH_MS);
+
+app.get('/api/special-events', async (req, res) => {
+    const { rows: events } = await pool.query(
+        `SELECT re.id, rs.name, rs.car_classes, re.length_minutes, re.distance_km,
+                re.event_start_date, re.event_end_date
+         FROM race_events re
+         JOIN race_series rs ON rs.id = re.race_series_id
+         WHERE rs.source = 'special_event'`
+    );
+    const { rows: timeslots } = await pool.query(
+        `SELECT ret.race_event_id, ret.start_at
+         FROM race_event_timeslots ret
+         JOIN race_events re ON re.id = ret.race_event_id
+         JOIN race_series rs ON rs.id = re.race_series_id
+         WHERE rs.source = 'special_event'
+         ORDER BY ret.start_at`
+    );
+
+    const result = events.map((e) => ({
+        id: e.id,
+        name: e.name,
+        carClasses: e.car_classes,
+        lengthMinutes: e.length_minutes,
+        distanceKm: e.distance_km,
+        dateRange: e.event_start_date ? { start: e.event_start_date, end: e.event_end_date } : null,
+        timeslots: timeslots.filter((t) => t.race_event_id === e.id).map((t) => t.start_at),
+    }));
+
+    res.json(result);
+});
+
+// =======
+// Race Event Signups (driver registration)
+// =======
+
+app.get('/api/race-events/:id/signups', async (req, res) => {
+    const { rows } = await pool.query(
+        `SELECT s.*, d.name AS driver_name, d.nickname AS driver_nickname
+         FROM race_event_signups s
+         LEFT JOIN murder_drivers d ON d.id = s.driver_id
+         WHERE s.race_event_id = $1
+         ORDER BY s.signed_up_at`,
+        [req.params.id]
+    );
+    res.json(rows);
+});
+
+app.post('/api/race-events/:id/signups', async (req, res) => {
+    const { driverId, guestName, guestIracingId, guestTimezone, carClass } = req.body;
+
+    const { rows } = await pool.query(
+        `INSERT INTO race_event_signups (race_event_id, driver_id, guest_name, guest_iracing_id, guest_timezone, car_class)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [req.params.id, driverId ?? null, guestName ?? null, guestIracingId ?? null, guestTimezone ?? null, carClass]
+    );
+    res.status(201).json(rows[0]);
+});
+
+app.patch('/api/race-event-signups/:id', async (req, res) => {
+    const { carClass } = req.body;
+
+    const { rows } = await pool.query(
+        `UPDATE race_event_signups
+         SET car_class = COALESCE($1, car_class)
+         WHERE id = $2
+         RETURNING *`,
+        [carClass ?? null, req.params.id]
+    );
+
+    if (rows.length === 0) return res.status(404).json({ error: 'Signup not found' });
+    res.json(rows[0]);
+});
+
+app.delete('/api/race-event-signups/:id', async (req, res) => {
+    await pool.query('DELETE FROM race_event_signups WHERE id = $1', [req.params.id]);
+    res.status(204).end();
 });

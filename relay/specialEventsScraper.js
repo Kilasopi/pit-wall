@@ -16,17 +16,8 @@ function matchNewsPost(eventName, newsIndex) {
     }) ?? null;
 }
 
-// Gets the timeslots from the specific news page
-async function fetchTimeslots(url) {
-    const res = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
+// Parses the "TIMES TO RACE" heading + following <ul> into raw timeslots
+function extractTimeslots($) {
     const heading = $('h3').filter((_, el) => $(el).text().trim().toUpperCase() === 'TIMES TO RACE').first();
     if (heading.length === 0) return [];
 
@@ -51,6 +42,62 @@ async function fetchTimeslots(url) {
     });
 
     return slots;
+}
+
+// Parses the "CARS AND CLASSES COMPETING" heading into a flat list of car
+// names (spanning every class listed) — same shape as race_series.car_classes
+// already stores for the regular schedule, so downstream class-derivation
+// logic doesn't need a special case for special events.
+function extractCarNames($) {
+    const heading = $('h3').filter((_, el) => /CARS AND CLASSES/i.test($(el).text())).first();
+    if (heading.length === 0) return [];
+
+    const cars = [];
+    let node = heading.next();
+    while (node.length && !node.is('h3')) {
+        if (node.is('ul')) {
+            node.find('li').each((_, li) => cars.push($(li).text().trim()));
+        }
+        node = node.next();
+    }
+
+    return cars;
+}
+
+// Fetches a special event's news post once and parses both its timeslots
+// and its car list out of the same page load.
+async function fetchArticleDetails(url) {
+    const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    return {
+        slots: extractTimeslots($),
+        carNames: extractCarNames($),
+    };
+}
+
+// Parses the "Cars Competing" <details><summary> text already present in
+// each event's own section on the special-events listing page (no extra
+// fetch needed). Format is inconsistent across events — "HPD // GT1 //
+// GT2", "GT3 Class \ GT4 Class", "GTP // LMP2 // GT3 (IMSA)" — so this
+// splits on the separators, strips parenthetical notes and the word
+// "Class(es)", and returns whatever fragments are left. Available for
+// every event regardless of whether its news post exists yet, unlike
+// the timeslot/car-name extraction which needs a matched post.
+function extractCarClassFragments(section, $) {
+    const summary = $(section).find('details summary').first().text().trim();
+    if (!summary) return [];
+
+    return summary
+        .split(/\s*(?:\/\/|\\)\s*/)
+        .map((part) => part.replace(/\([^)]*\)/g, '').replace(/\bclass(es)?\b/gi, '').replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
 }
 
 // Fetch news post for special event timeslot extraction
@@ -174,22 +221,26 @@ async function fetchSpecialEvents(){
         const { lengthMinutes, distanceKm } = extractDistanceOrDuration(name, descriptionText);
 
         const dateRange = dateExtraction(section, $);
-        events.push({ name, lengthMinutes, distanceKm, dateRange });
+        const classFragments = extractCarClassFragments(section, $);
+        events.push({ name, lengthMinutes, distanceKm, dateRange, classFragments });
     });
 
     const newsIndex = await fetchNewsIndex().catch(() => []);
 
-    return Promise.all(events.map(async (event) => {
+    return Promise.all(events.map(async ({ classFragments, ...event }) => {
         const post = matchNewsPost(event.name, newsIndex);
-        if (!post) return { ...event, timeslots: [] };
+        if (!post) {
+            return { ...event, timeslots: [], carClasses: classFragments.length > 0 ? classFragments : null };
+        }
 
-        const slots = await fetchTimeslots(post.url).catch(() => []);
+        const { slots, carNames } = await fetchArticleDetails(post.url).catch(() => ({ slots: [], carNames: [] }));
         const timeslots = slots
             .map((slot) => resolveTimeslot(event.dateRange, slot))
             .filter(Boolean)
             .map((d) => d.toISOString());
 
-        return { ...event, timeslots };
+        const carClasses = carNames.length > 0 ? carNames : (classFragments.length > 0 ? classFragments : null);
+        return { ...event, timeslots, carClasses };
     }));
 }
 

@@ -4,6 +4,7 @@ import { NavBar } from '@/components/NavBar';
 import { useRaceEvents } from '@/hooks/useRaceEvents';
 import { useSpecialEvents } from '@/hooks/useSpecialEvents';
 import { useTimezone, formatInTimezone, COMMON_TIMEZONES, getUtcOffsetLabel } from '@/hooks/useTimeZone';
+import { EventSignups } from '@/components/EventSignups';
 
 import {
   Card,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Toggle } from '@/components/ui/toggle';
 
 function isUpcoming(event) {
     const now = new Date();
@@ -112,14 +114,14 @@ function Schedule() {
                     </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button
-                        type="button"
-                        variant={onlyHighlighted ? 'secondary' : 'outline'}
+                    <Toggle
+                        variant="outline"
                         size="sm"
-                        onClick={() => setOnlyHighlighted((v) => !v)}
+                        pressed={onlyHighlighted}
+                        onPressedChange={setOnlyHighlighted}
                     >
                         This & Next Week
-                    </Button>
+                    </Toggle>
                     <Button
                         type="button"
                         variant="ghost"
@@ -193,6 +195,7 @@ function Schedule() {
                                                             );
                                                         })}
                                                     </div>
+                                                    <EventSignups raceEventId={event.id} carClasses={s.car_classes} />
                                                 </CardContent>
                                             </Card>
                                         );
@@ -208,7 +211,6 @@ function Schedule() {
                     <Card>
                         <CardContent>
                             {sortedSpecialEvents
-                                .filter((event) => !onlyHighlighted || isThisOrNextWeek(event.timeslots?.[0] ?? event.dateRange?.start))
                                 .map((event) => {
                             const highlight = weekHighlightClass(event.timeslots?.[0] ?? event.dateRange?.start);
                             return (
@@ -259,6 +261,7 @@ function Schedule() {
                                             })}
                                         </div>
                                     )}
+                                    <EventSignups raceEventId={event.id} carClasses={event.carClasses} />
                                 </CardContent>
                             </Card>
                             );
