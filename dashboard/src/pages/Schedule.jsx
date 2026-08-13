@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { CircleQuestionMark } from 'lucide-react';
 import { NavBar } from '@/components/NavBar';
-import { cn } from '@/lib/utils';
 import { useRaceEvents } from '@/hooks/useRaceEvents';
 import { useSpecialEvents } from '@/hooks/useSpecialEvents';
 import { useTimezone, formatInTimezone, COMMON_TIMEZONES, getUtcOffsetLabel } from '@/hooks/useTimeZone';
@@ -22,6 +21,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 function isUpcoming(event) {
     const now = new Date();
@@ -95,56 +95,57 @@ function Schedule() {
                 <h1 className="text-xl font-heading font-medium">Team M.U.R.D.E.R</h1>
             </div>
             <NavBar />
-            <div className="relative mb-2 flex items-center justify-end gap-2">
-                <button
-                    type="button"
-                    onClick={() => setOnlyHighlighted((v) => !v)}
-                    className={cn(
-                        'rounded-md border px-2 py-1 text-sm hover:bg-accent hover:text-foreground',
-                        onlyHighlighted ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground'
+            <div className="relative mb-4 flex items-end justify-between gap-2">
+                <div>
+                    <Label className="mb-1 block text-base text-muted-foreground">Timezone</Label>
+                    <Select value={timezone} onValueChange={setTimezone}>
+                        <SelectTrigger className="w-64">
+                            <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {COMMON_TIMEZONES.map((tz) => (
+                                <SelectItem key={tz} value={tz}>
+                                    {tz.replace('_', ' ')} ({getUtcOffsetLabel(tz)})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant={onlyHighlighted ? 'secondary' : 'outline'}
+                        size="sm"
+                        onClick={() => setOnlyHighlighted((v) => !v)}
+                    >
+                        This & Next Week
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setShowLegend((v) => !v)}
+                        aria-label="What do the highlight colors mean?"
+                    >
+                        <CircleQuestionMark className="size-4" />
+                    </Button>
+                    {showLegend && (
+                        <div className="absolute top-full right-0 z-10 mt-2 flex w-64 flex-col gap-1 rounded-md border bg-popover p-3 text-sm text-popover-foreground shadow-md">
+                            <div className="flex items-center gap-2">
+                                <span className="h-3 w-3 rounded-sm border border-purple-700 bg-purple-950/40" />
+                                <span>Events Happening This Week</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="h-3 w-3 rounded-sm border border-amber-600 bg-yellow-950/40" />
+                                <span>Events Happening Next Week</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="h-3 w-3 rounded-sm border border-blue-500 bg-blue-950/40" />
+                                <span>Special Events</span>
+                            </div>
+                        </div>
                     )}
-                >
-                    This & next week only
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setShowLegend((v) => !v)}
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    aria-label="What do the highlight colors mean?"
-                >
-                    <CircleQuestionMark className="size-4" />
-                </button>
-                {showLegend && (
-                    <div className="absolute top-full right-0 z-10 mt-2 flex w-64 flex-col gap-1 rounded-md border bg-popover p-3 text-sm text-popover-foreground shadow-md">
-                        <div className="flex items-center gap-2">
-                            <span className="h-3 w-3 rounded-sm border border-purple-700 bg-purple-950/40" />
-                            <span>Events Happening This Week</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="h-3 w-3 rounded-sm border border-amber-600 bg-yellow-950/40" />
-                            <span>Events Happening Next Week</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="h-3 w-3 rounded-sm border border-blue-500 bg-blue-950/40" />
-                            <span>Special Events</span>
-                        </div>
-                    </div>
-                )}
-            </div>
-            <div className="mb-2">
-                <Label className="mb-1 block text-sm text-muted-foreground">Timezone</Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                    <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Select timezone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {COMMON_TIMEZONES.map((tz) => (
-                            <SelectItem key={tz} value={tz}>
-                                {tz.replace('_', ' ')} ({getUtcOffsetLabel(tz)})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                </div>
             </div>
             <div className="grid items-start gap-6 md:grid-cols-2">
                 <div>
