@@ -13,8 +13,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-const ALL_CAR_CLASSES = ['GTP', 'LMP2', 'GT1', 'GT2', 'GT3', 'GT4', 'Porsche Cup', 'TCR', 'M2'];
-const CLASS_TOKEN_PATTERN = new RegExp(`\\b(${['GTP', 'LMP2', 'GT1', 'GT2', 'GT3', 'GT4', 'TCR', 'M2'].join('|')})\\b`);
+const ALL_CAR_CLASSES = ['GTP', 'LMP2', 'GT1', 'GT2', 'GT3', 'GT4', 'Porsche Cup', 'TCR', 'BMW M2'];
+const CLASS_TOKEN_PATTERN = new RegExp(`\\b(${['GTP', 'LMP2', 'GT1', 'GT2', 'GT3', 'GT4', 'TCR', 'BMW M2'].join('|')})\\b`);
 
 // Exact-name overrides, checked before the regex. Two reasons a car needs
 // one: its class isn't in its name at all (Dallara P217 has no "LMP2"),
@@ -29,6 +29,8 @@ const CAR_NAME_TO_CLASS = {
     'Chevrolet Corvette C6.R': 'GT1',
     'HPD': 'LMP2',
     'Porsche Cup 992.2': 'Porsche Cup',
+    'BMW M Hybrid V8 (Evo)': 'GTP',
+    'Ferrari 499P': 'GTP'
 };
 
 // carNames are either individual car model names (e.g. "Ferrari 296 GT3",
@@ -112,7 +114,7 @@ export function RaceEventSignupForm({ raceEventId, carClasses, onAdded, onCancel
                     <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select driver">
                             {(value) => {
-                                if (value === 'guest') return 'Guest driver';
+                                if (value === 'guest') return 'Guest Driver';
                                 const driver = rosterDrivers.find((d) => String(d.id) === value);
                                 return driver ? (driver.nickname || driver.name) : null;
                             }}
@@ -121,10 +123,10 @@ export function RaceEventSignupForm({ raceEventId, carClasses, onAdded, onCancel
                     <SelectContent>
                         {rosterDrivers.map((d) => (
                             <SelectItem key={d.id} value={String(d.id)}>
-                                {d.nickname || d.name}
+                                {d.nickname ? `${d.nickname} | ${d.name}` : d.name}
                             </SelectItem>
                         ))}
-                        <SelectItem value="guest">Guest driver</SelectItem>
+                        <SelectItem value="guest">Guest Driver</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
