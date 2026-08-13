@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { CircleQuestionMark } from 'lucide-react';
 import { NavBar } from '@/components/NavBar';
+import { cn } from '@/lib/utils';
 import { useRaceEvents } from '@/hooks/useRaceEvents';
 import { useSpecialEvents } from '@/hooks/useSpecialEvents';
 import { useTimezone, formatInTimezone, COMMON_TIMEZONES, getUtcOffsetLabel } from '@/hooks/useTimeZone';
@@ -43,12 +45,41 @@ function ordinalSuffix(day) {
     return 'th';
 }
 
+function startOfWeek(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function weekHighlightClass(dateValue) {
+    if (!dateValue) return '';
+
+    const date = new Date(dateValue);
+    const thisWeekStart = startOfWeek(new Date());
+    const nextWeekStart = new Date(thisWeekStart);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    const weekAfterStart = new Date(nextWeekStart);
+    weekAfterStart.setDate(weekAfterStart.getDate() + 7);
+
+    if (date >= thisWeekStart && date < nextWeekStart) return 'border border-purple-700 bg-purple-950/40';
+    if (date >= nextWeekStart && date < weekAfterStart) return 'border border-amber-600 bg-yellow-950/40';
+    return '';
+}
+
+function isThisOrNextWeek(dateValue) {
+    return weekHighlightClass(dateValue) !== '';
+}
+
 function Schedule() {
     const series = useRaceEvents();
     const specialEvents = useSpecialEvents();
 
     const [timezone, setTimezone] = useTimezone();
-    const [viewMode, setViewMode] = useState('Series');
+    const [showLegend, setShowLegend] = useState(false);
+    const [onlyHighlighted, setOnlyHighlighted] = useState(false);
 
     const sortedSeries = [...series].sort((a, b) => seriesEarliestTimeslot(a) - seriesEarliestTimeslot(b));
 
@@ -58,16 +89,48 @@ function Schedule() {
         return new Date(a.dateRange.start) - new Date(b.dateRange.start);
     });
 
-    const allUpcomingEvents = series
-        .flatMap((s) => s.events.filter(isUpcoming).map((event) => ({ ...event, seriesName: s.name })))
-        .sort((a, b) => earliestTimeslot(a) - earliestTimeslot(b));
-
     return(
         <div className='min-h-screen bg-background p-6 text-foreground'>
             <div className="mb-2 flex items-center justify-between">
                 <h1 className="text-xl font-heading font-medium">Team M.U.R.D.E.R</h1>
             </div>
             <NavBar />
+            <div className="relative mb-2 flex items-center justify-end gap-2">
+                <button
+                    type="button"
+                    onClick={() => setOnlyHighlighted((v) => !v)}
+                    className={cn(
+                        'rounded-md border px-2 py-1 text-sm hover:bg-accent hover:text-foreground',
+                        onlyHighlighted ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground'
+                    )}
+                >
+                    This & next week only
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setShowLegend((v) => !v)}
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    aria-label="What do the highlight colors mean?"
+                >
+                    <CircleQuestionMark className="size-4" />
+                </button>
+                {showLegend && (
+                    <div className="absolute top-full right-0 z-10 mt-2 flex w-64 flex-col gap-1 rounded-md border bg-popover p-3 text-sm text-popover-foreground shadow-md">
+                        <div className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-sm border border-purple-700 bg-purple-950/40" />
+                            <span>Events Happening This Week</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-sm border border-amber-600 bg-yellow-950/40" />
+                            <span>Events Happening Next Week</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-sm border border-blue-500 bg-blue-950/40" />
+                            <span>Special Events</span>
+                        </div>
+                    </div>
+                )}
+            </div>
             <div className="mb-2">
                 <Label className="mb-1 block text-sm text-muted-foreground">Timezone</Label>
                 <Select value={timezone} onValueChange={setTimezone}>
@@ -83,23 +146,15 @@ function Schedule() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="mb-4">
-                <Label className="mb-1 block text-sm text-muted-foreground">Order By</Label>
-                <Select value={viewMode} onValueChange={setViewMode}>
-                    <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Group by…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Start Date">Start Date</SelectItem>
-                        <SelectItem value="Series">Series</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
             <div className="grid items-start gap-6 md:grid-cols-2">
                 <div>
                     <h1 className='mb-4 text-2xl font-bold'>iRacing Scheduled Events Calendar</h1>
-                    {viewMode === 'Series' && sortedSeries.map((s) => {
-                        const upcomingEvents = s.events.filter(isUpcoming).sort((a, b) => earliestTimeslot(a) - earliestTimeslot(b));
+                    {sortedSeries.map((s) => {
+                        let upcomingEvents = s.events.filter(isUpcoming).sort((a, b) => earliestTimeslot(a) - earliestTimeslot(b));
+                        if (onlyHighlighted) {
+                            upcomingEvents = upcomingEvents.filter((event) => isThisOrNextWeek(event.timeslots?.[0]));
+                        }
+                        if (upcomingEvents.length === 0) return null;
                         return (
                             <Card key={s.id} className="mb-4">
                                 <CardHeader>
@@ -115,7 +170,7 @@ function Schedule() {
                                             })
                                             : null;
                                         return (
-                                            <Card key={event.name} className="mb-2">
+                                            <Card key={event.name} className={`mb-2 ${weekHighlightClass(event.timeslots?.[0])}`}>
                                                 <CardContent>
                                                     <p className="font-medium">
                                                         {event.name} - {firstDate}
@@ -145,96 +200,70 @@ function Schedule() {
                             </Card>
                         );
                     })}
-                    {viewMode === 'Start Date' && allUpcomingEvents.map((event) => {
-                        const firstDate = event.timeslots?.[0]
-                            ? new Date(event.timeslots[0]).toLocaleDateString(undefined, {
-                                month: 'short',
-                                day: 'numeric',
-                            })
-                            : null;
-                        return (
-                            <Card key={`${event.seriesName}-${event.name}`} className="mb-2">
-                                <CardContent>
-                                    <p className="font-heading text-base leading-snug font-medium mb-1">{event.seriesName}</p>
-                                    <p className="font-medium">
-                                        {event.name} - {firstDate}
-                                    </p>
-                                    <p>Location: {event.track}</p>
-                                    <p>Length: {Math.floor(event.length_minutes / 60)}h{event.length_minutes % 60 !== 0 && ` ${event.length_minutes % 60}m`}</p>
-                                    <div className="mt-1 flex flex-wrap gap-y-0">
-                                        <span className="text-sm text-muted-foreground">Timeslots: </span>
-                                        {event.timeslots.map((t, i) => {
-                                            const weekday = formatInTimezone(t, timezone, { weekday: 'short' });
-                                            const day = Number(formatInTimezone(t, timezone, { day: 'numeric' }));
-                                            const time = formatInTimezone(t, timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-
-                                            return (
-                                                <span key={t} className="text-sm text-muted-foreground">
-                                                     {weekday} {day}{ordinalSuffix(day)}, {time}
-                                                    {i < event.timeslots.length - 1 ? ' | ' : ''}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
                 </div>
 
                 <div>
                     <h2 className="mb-4 text-2xl font-bold">iRacing Special Events Calendar</h2>
-                    {sortedSpecialEvents.map((event) => (
-                        <Card key={event.name} className="mb-2 border-blue-500 bg-blue-950/20">
-                            <CardContent>
-                                <p className="font-medium">
-                                    {event.name}
-                                    {event.dateRange && (
-                                        <span className="ml-2 text-sm text-muted-foreground">
-                                            {new Date(event.dateRange.start).toLocaleDateString(undefined, {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                timeZone: 'UTC',
-                                            })}
-                                            {event.dateRange.end && event.dateRange.end !== event.dateRange.start && (
-                                                <>
-                                                    {' – '}
-                                                    {new Date(event.dateRange.end).toLocaleDateString(undefined, {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        timeZone: 'UTC',
-                                                    })}
-                                                </>
-                                            )}
-                                        </span>
-                                    )}
-                                </p>
-                                {event.distanceKm && <p>Distance: {event.distanceKm}km</p>}
-                                {event.lengthMinutes && (
-                                    <p>
-                                        Length: {Math.floor(event.lengthMinutes / 60)}h{event.lengthMinutes % 60 !== 0 && ` ${event.lengthMinutes % 60}m`}
+                    <Card>
+                        <CardContent>
+                            {sortedSpecialEvents
+                                .filter((event) => !onlyHighlighted || isThisOrNextWeek(event.timeslots?.[0] ?? event.dateRange?.start))
+                                .map((event) => {
+                            const highlight = weekHighlightClass(event.timeslots?.[0] ?? event.dateRange?.start);
+                            return (
+                            <Card key={event.name} className={`mb-2 ${highlight || 'bg-blue-950/40'}`}>
+                                <CardContent>
+                                    <p className="font-medium">
+                                        {event.name}
+                                        {event.dateRange && (
+                                            <span className="ml-2 text-sm text-muted-foreground">
+                                                {new Date(event.dateRange.start).toLocaleDateString(undefined, {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    timeZone: 'UTC',
+                                                })}
+                                                {event.dateRange.end && event.dateRange.end !== event.dateRange.start && (
+                                                    <>
+                                                        {' – '}
+                                                        {new Date(event.dateRange.end).toLocaleDateString(undefined, {
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                            timeZone: 'UTC',
+                                                        })}
+                                                    </>
+                                                )}
+                                            </span>
+                                        )}
                                     </p>
-                                )}
-                                {event.timeslots.length > 0 && (
-                                    <div className='mt-1 flex flex-wrap gap-y-0'>
-                                        <span className="text-sm text-muted-foreground">Timeslots: </span>
-                                        {event.timeslots.map((t, i) => {
-                                            const weekday = formatInTimezone(t, timezone, { weekday: 'short' });
-                                            const day = Number(formatInTimezone(t, timezone, { day: 'numeric' }));
-                                            const time = formatInTimezone(t, timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+                                    {event.distanceKm && <p>Distance: {event.distanceKm}km</p>}
+                                    {event.lengthMinutes && (
+                                        <p>
+                                            Length: {Math.floor(event.lengthMinutes / 60)}h{event.lengthMinutes % 60 !== 0 && ` ${event.lengthMinutes % 60}m`}
+                                        </p>
+                                    )}
+                                    {event.timeslots.length > 0 && (
+                                        <div className='mt-1 flex flex-wrap gap-y-0'>
+                                            <span className="text-sm text-muted-foreground">Timeslots: </span>
+                                            {event.timeslots.map((t, i) => {
+                                                const weekday = formatInTimezone(t, timezone, { weekday: 'short' });
+                                                const day = Number(formatInTimezone(t, timezone, { day: 'numeric' }));
+                                                const time = formatInTimezone(t, timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
-                                            return (
-                                                <span key={t} className='text-sm text-muted-foreground'>
-                                                     {weekday} {day}{ordinalSuffix(day)}, {time}
-                                                    {i < event.timeslots.length - 1 ? ' | ' : ''}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ))}
+                                                return (
+                                                    <span key={t} className='text-sm text-muted-foreground'>
+                                                         {weekday} {day}{ordinalSuffix(day)}, {time}
+                                                        {i < event.timeslots.length - 1 ? ' | ' : ''}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                            );
+                        })}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>
