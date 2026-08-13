@@ -19,6 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 function isUpcoming(event) {
     const now = new Date();
@@ -47,7 +48,7 @@ function Schedule() {
     const specialEvents = useSpecialEvents();
 
     const [timezone, setTimezone] = useTimezone();
-    const [viewMode, setViewMode] = useState('date');
+    const [viewMode, setViewMode] = useState('Series');
 
     const sortedSeries = [...series].sort((a, b) => seriesEarliestTimeslot(a) - seriesEarliestTimeslot(b));
 
@@ -67,31 +68,37 @@ function Schedule() {
                 <h1 className="text-xl font-heading font-medium">Team M.U.R.D.E.R</h1>
             </div>
             <NavBar />
-            <Select value={timezone} onValueChange={setTimezone}>
-                <SelectTrigger className="w-64">
-                    <SelectValue placeholder="Select timezone" />
-                </SelectTrigger>
-                <SelectContent>
-                    {COMMON_TIMEZONES.map((tz) => (
-                        <SelectItem key={tz} value={tz}>
-                            {tz.replace('_', ' ')} ({getUtcOffsetLabel(tz)})
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            <Select value={viewMode} onValueChange={setViewMode}>
-                <SelectTrigger className="w-64">
-                    <SelectValue placeholder="Group by…" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="date">By start date</SelectItem>
-                    <SelectItem value="series">By series</SelectItem>
-                </SelectContent>
-            </Select>
+            <div className="mb-2">
+                <Label className="mb-1 block text-sm text-muted-foreground">Timezone</Label>
+                <Select value={timezone} onValueChange={setTimezone}>
+                    <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {COMMON_TIMEZONES.map((tz) => (
+                            <SelectItem key={tz} value={tz}>
+                                {tz.replace('_', ' ')} ({getUtcOffsetLabel(tz)})
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="mb-4">
+                <Label className="mb-1 block text-sm text-muted-foreground">Order By</Label>
+                <Select value={viewMode} onValueChange={setViewMode}>
+                    <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Group by…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Start Date">Start Date</SelectItem>
+                        <SelectItem value="Series">Series</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
             <div className="grid items-start gap-6 md:grid-cols-2">
                 <div>
-                    <h1 className='mb-4 text-2xl font-bold'>Schedule</h1>
-                    {viewMode === 'series' && sortedSeries.map((s) => {
+                    <h1 className='mb-4 text-2xl font-bold'>iRacing Scheduled Events Calendar</h1>
+                    {viewMode === 'Series' && sortedSeries.map((s) => {
                         const upcomingEvents = s.events.filter(isUpcoming).sort((a, b) => earliestTimeslot(a) - earliestTimeslot(b));
                         return (
                             <Card key={s.id} className="mb-4">
@@ -113,17 +120,19 @@ function Schedule() {
                                                     <p className="font-medium">
                                                         {event.name} - {firstDate}
                                                     </p>
-                                                    <p>{event.track}</p>
-                                                    <p>{Math.floor(event.length_minutes / 60)}h{event.length_minutes % 60 !== 0 && ` ${event.length_minutes % 60}m`}</p>
-                                                    <div className="mt-1 flex flex-wrap gap-2">
-                                                        {event.timeslots.map((t) => {
+                                                    <p>Location: {event.track}</p>
+                                                    <p>Length: {Math.floor(event.length_minutes / 60)}h{event.length_minutes % 60 !== 0 && ` ${event.length_minutes % 60}m`}</p>
+                                                    <div className="mt-1 flex flex-wrap gap-y-0">
+                                                        <span className="text-sm text-muted-foreground">Timeslots: </span>
+                                                        {event.timeslots.map((t, i) => {
                                                             const weekday = formatInTimezone(t, timezone, { weekday: 'short' });
                                                             const day = Number(formatInTimezone(t, timezone, { day: 'numeric' }));
                                                             const time = formatInTimezone(t, timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
                                                             return (
                                                                 <span key={t} className="text-sm text-muted-foreground">
-                                                                    {weekday} {day}{ordinalSuffix(day)}, {time}
+                                                                     {weekday} {day}{ordinalSuffix(day)}, {time}
+                                                                    {i < event.timeslots.length - 1 ? ' | ' : ''}
                                                                 </span>
                                                             );
                                                         })}
@@ -136,7 +145,7 @@ function Schedule() {
                             </Card>
                         );
                     })}
-                    {viewMode === 'date' && allUpcomingEvents.map((event) => {
+                    {viewMode === 'Start Date' && allUpcomingEvents.map((event) => {
                         const firstDate = event.timeslots?.[0]
                             ? new Date(event.timeslots[0]).toLocaleDateString(undefined, {
                                 month: 'short',
@@ -146,21 +155,23 @@ function Schedule() {
                         return (
                             <Card key={`${event.seriesName}-${event.name}`} className="mb-2">
                                 <CardContent>
-                                    <p className="text-sm text-muted-foreground">{event.seriesName}</p>
+                                    <p className="font-heading text-base leading-snug font-medium mb-1">{event.seriesName}</p>
                                     <p className="font-medium">
                                         {event.name} - {firstDate}
                                     </p>
-                                    <p>{event.track}</p>
-                                    <p>{Math.floor(event.length_minutes / 60)}h{event.length_minutes % 60 !== 0 && ` ${event.length_minutes % 60}m`}</p>
-                                    <div className="mt-1 flex flex-wrap gap-2">
-                                        {event.timeslots.map((t) => {
+                                    <p>Location: {event.track}</p>
+                                    <p>Length: {Math.floor(event.length_minutes / 60)}h{event.length_minutes % 60 !== 0 && ` ${event.length_minutes % 60}m`}</p>
+                                    <div className="mt-1 flex flex-wrap gap-y-0">
+                                        <span className="text-sm text-muted-foreground">Timeslots: </span>
+                                        {event.timeslots.map((t, i) => {
                                             const weekday = formatInTimezone(t, timezone, { weekday: 'short' });
                                             const day = Number(formatInTimezone(t, timezone, { day: 'numeric' }));
                                             const time = formatInTimezone(t, timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
                                             return (
                                                 <span key={t} className="text-sm text-muted-foreground">
-                                                    {weekday} {day}{ordinalSuffix(day)}, {time}
+                                                     {weekday} {day}{ordinalSuffix(day)}, {time}
+                                                    {i < event.timeslots.length - 1 ? ' | ' : ''}
                                                 </span>
                                             );
                                         })}
@@ -172,7 +183,7 @@ function Schedule() {
                 </div>
 
                 <div>
-                    <h2 className="mb-4 text-2xl font-bold">Special Events</h2>
+                    <h2 className="mb-4 text-2xl font-bold">iRacing Special Events Calendar</h2>
                     {sortedSpecialEvents.map((event) => (
                         <Card key={event.name} className="mb-2 border-blue-500 bg-blue-950/20">
                             <CardContent>
@@ -183,15 +194,43 @@ function Schedule() {
                                             {new Date(event.dateRange.start).toLocaleDateString(undefined, {
                                                 month: 'short',
                                                 day: 'numeric',
+                                                timeZone: 'UTC',
                                             })}
+                                            {event.dateRange.end && event.dateRange.end !== event.dateRange.start && (
+                                                <>
+                                                    {' – '}
+                                                    {new Date(event.dateRange.end).toLocaleDateString(undefined, {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        timeZone: 'UTC',
+                                                    })}
+                                                </>
+                                            )}
                                         </span>
                                     )}
                                 </p>
-                                {event.distanceKm && <p>{event.distanceKm}km</p>}
+                                {event.distanceKm && <p>Distance: {event.distanceKm}km</p>}
                                 {event.lengthMinutes && (
                                     <p>
-                                        {Math.floor(event.lengthMinutes / 60)}h{event.lengthMinutes % 60 !== 0 && ` ${event.lengthMinutes % 60}m`}
+                                        Length: {Math.floor(event.lengthMinutes / 60)}h{event.lengthMinutes % 60 !== 0 && ` ${event.lengthMinutes % 60}m`}
                                     </p>
+                                )}
+                                {event.timeslots.length > 0 && (
+                                    <div className='mt-1 flex flex-wrap gap-y-0'>
+                                        <span className="text-sm text-muted-foreground">Timeslots: </span>
+                                        {event.timeslots.map((t, i) => {
+                                            const weekday = formatInTimezone(t, timezone, { weekday: 'short' });
+                                            const day = Number(formatInTimezone(t, timezone, { day: 'numeric' }));
+                                            const time = formatInTimezone(t, timezone, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
+                                            return (
+                                                <span key={t} className='text-sm text-muted-foreground'>
+                                                     {weekday} {day}{ordinalSuffix(day)}, {time}
+                                                    {i < event.timeslots.length - 1 ? ' | ' : ''}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
