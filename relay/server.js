@@ -5,6 +5,9 @@ const cheerio = require('cheerio');
 const { WebSocketServer } = require('ws');
 const { Pool } = require('pg');
 
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
 const { fetchScheduleEvents } = require('./iRacingScheduleScraper.js');
 const { fetchSpecialEvents } = require('./specialEventsScraper.js');
 
@@ -20,11 +23,100 @@ const pool = new Pool({
     ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        const { rows: users } = await pool.query(
+            `SELECT id, username, password_hash
+            FROM users
+            WHERE username = $1`,
+            [username]
+        );
+        if (!users[0] || users[0].password_hash == null) {
+            return res.status(401).json({ error: 'Invalid username or password' });
+        }
+
+        const valid = await bcrypt.compare(password, users[0].password_hash);
+
+        if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
+
+        const token = jwt.sign({ userId: users[0].id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        res.json({ token, user: { id: users[0].id, username: users[0].username } });
+    } catch (err) {
+        console.error('Failed to log in:', err.message);
+        res.status(500).json({ error: 'Failed to log in' });
+    }
+})
+
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        const { rows } = await pool.query(
+            `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`,
+            [username, passwordHash]
+        );
+
+        const token = jwt.sign({ userId: rows[0].id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        res.status(201).json({ token, user: rows[0] });
+    } catch (err) {
+        if (err.code === '23505') return res.status(409).json({ error: 'Username already taken' });
+        console.error('Failed to register:', err.message);
+        res.status(500).json({ error: 'Failed to register' });
+    }
+});
+
+function requireAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.slice(7); // strip "Bearer " off the front
+
+    try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        req.userId = payload.userId;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+}
+
 app.get('/api/murder-drivers', async (req, res) => {
     const { rows } = await pool.query(
         'SELECT id, name, nickname, iracing_id, active, timezone FROM murder_drivers ORDER BY name'
     );
     res.json(rows);
+});
+
+app.get('/api/murder-drivers/unclaimed', async (req, res) => {
+    const { rows } = await pool.query(
+        `SELECT id, name FROM murder_drivers
+         WHERE id NOT IN (SELECT driver_id FROM users WHERE driver_id IS NOT NULL)
+         ORDER BY name`
+    );
+    res.json(rows);
+});
+
+app.post('/api/users/me/claim-driver', requireAuth, async (req, res) => {
+    try {
+        const { driverId } = req.body;
+
+        const { rows } = await pool.query(
+            `UPDATE users SET driver_id = $1 WHERE id = $2 AND driver_id IS NULL RETURNING id, username, driver_id`,
+            [driverId, req.userId]
+        );
+
+        if (!rows[0]) return res.status(409).json({ error: 'You already have a claimed profile' });
+        res.json(rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(409).json({ error: 'That driver is already claimed' });
+        console.error('Failed to claim driver:', err.message);
+        res.status(500).json({ error: 'Failed to claim driver' });
+    }
 });
 
 app.get('/api/entry-drivers', async (req, res) => {
@@ -634,6 +726,43 @@ app.delete('/api/team-members/:signupId', async (req, res) => {
     await pool.query('DELETE FROM race_event_team_members WHERE signup_id = $1', [req.params.signupId]);
     res.status(204).end();
 })
+
+app.post('/api/timeslots/:timeslotId/vote', requireAuth, async (req, res) => {
+    try {
+        const { signupId } = req.body;
+
+        const { rows: memberRows } = await pool.query(
+            `SELECT team_id FROM race_event_team_members WHERE signup_id = $1`, 
+            [signupId]
+        );
+
+        const teamId = memberRows[0]?.team_id;
+        if (!teamId) return res.status(404).json({ error: 'Signup is not on a team' });
+
+        const { rows } = await pool.query(
+            `INSERT INTO race_event_timeslot_votes (timeslot_id, team_id, signup_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (timeslot_id, signup_id) DO NOTHING
+            RETURNING *`,
+            [req.params.timeslotId, teamId, signupId]
+        );
+        res.status(201).json(rows[0] ?? 
+            { timeslot_id: Number(req.params.timeslotId), team_id: teamId, signup_id: signupId }
+        );
+
+    } catch(err) {
+        console.error('Failed to record timeslot vote:', err.message);
+        res.status(500).json({ error: 'Failed to record timeslot vote' });
+    }
+});
+
+app.delete('/api/timeslots/:timeslotId/vote/:signupId', requireAuth, async (req, res) => {
+    await pool.query(
+        `DELETE FROM race_event_timeslot_votes WHERE timeslot_id = $1 AND signup_id = $2`,
+        [req.params.timeslotId, req.params.signupId]
+    );
+    res.status(204).end();
+});
 
 app.get('/api/registered-races', async (req,res) => {
     const { rows } = await pool.query(`
