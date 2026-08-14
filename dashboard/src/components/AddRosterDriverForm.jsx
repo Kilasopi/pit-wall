@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import cityTimezones from 'city-timezones';
 
 import { RELAY_HTTP_URL } from '@/lib/relay';
 import { Button } from '@/components/ui/button';
@@ -11,19 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-
-function gmtOffset(timezone) {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      timeZoneName: 'shortOffset',
-    }).formatToParts(new Date());
-
-    return parts.find((part) => part.type === 'timeZoneName')?.value ?? '';
-  } catch {
-    return '';
-  }
-}
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { COMMON_TIMEZONES, getUtcOffsetLabel } from '@/hooks/useTimeZone';
 
 export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
   const isEditing = Boolean(driver);
@@ -31,39 +25,12 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
   const [name, setName] = useState(driver?.name ?? '');
   const [nickname, setNickname] = useState(driver?.nickname ?? '');
   const [iracingId, setIracingId] = useState(driver?.iracing_id ?? '');
-  const [city, setCity] = useState(driver?.city ?? '');
-  const [country, setCountry] = useState(driver?.country ?? '');
   const [timezone, setTimezone] = useState(driver?.timezone ?? '');
   const [active, setActive] = useState(driver?.active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const isValid =
-    name.trim().length > 0 &&
-    city.trim().length > 0 &&
-    country.trim().length === 2;
-
-  function detectTimezone(cityName, countryCode = country) {
-    if (!countryCode.trim()) return '';
-
-    const matches = cityTimezones.lookupViaCity(cityName.trim());
-
-    const match = matches.find(
-      (location) =>
-        location.iso2?.toLowerCase() === countryCode.trim().toLowerCase()
-    );
-
-    const detectedTimezone = match?.timezone ?? '';
-    setTimezone(detectedTimezone);
-
-    if (!detectedTimezone) {
-      setError(`Could not find ${cityName} in ${countryCode.toUpperCase()}`);
-    } else {
-      setError(null);
-    }
-
-    return detectedTimezone;
-  }
+  const isValid = name.trim().length > 0 && timezone.trim().length > 0;
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -74,20 +41,11 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
     setError(null);
 
     try {
-      const resolvedTimezone = timezone || detectTimezone(city);
-
-      if (!resolvedTimezone) {
-        setSubmitting(false);
-        return;
-      }
-
       const body = {
         name: name.trim(),
         nickname: nickname.trim() || null,
         iracingId: iracingId.trim() || null,
-        city: city.trim(),
-        country: country.trim() || null,
-        timezone: resolvedTimezone,
+        timezone,
       };
 
       if (isEditing) {
@@ -123,7 +81,6 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
         setName('');
         setNickname('');
         setIracingId('');
-        setCity('');
         setTimezone('');
       }
 
@@ -177,56 +134,21 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="rosterCity">City</Label>
-            <Input
-              id="rosterCity"
-              value={city}
-              onChange={(event) => {
-                setCity(event.target.value);
-                setTimezone('');
-                setError(null);
-              }}
-              onBlur={() => {
-                if (city.trim()) {
-                  detectTimezone(city);
-                }
-              }}
-              placeholder="London"
-              required
-            />
-
-            <p className="text-xs text-muted-foreground">
-              {timezone
-                ? `${timezone} (${gmtOffset(timezone)})`
-                : 'Timezone will be detected automatically'}
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="rosterCountry">Country code</Label>
-            <Input
-              id="rosterCountry"
-              value={country}
-              onChange={(event) => {
-                setCountry(event.target.value.toUpperCase());
-                setTimezone('');
-                setError(null);
-              }}
-              onBlur={() => {
-                if (city.trim() && country.trim()) {
-                  detectTimezone(city, country);
-                }
-              }}
-              placeholder="GB"
-              maxLength={2}
-              required
-            />
-
-            <p className="text-xs text-muted-foreground">
-              {timezone
-                ? `${timezone} (${gmtOffset(timezone)})`
-                : 'Enter a city and two-letter country code'}
-            </p>
+            <Label htmlFor="rosterTimezone">Timezone</Label>
+            <Select value={timezone} onValueChange={setTimezone}>
+              <SelectTrigger id="rosterTimezone" className="w-full">
+                <SelectValue placeholder="Select timezone">
+                  {(value) => value ? `${value.replace('_', ' ')} (${getUtcOffsetLabel(value)})` : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {COMMON_TIMEZONES.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz.replace('_', ' ')} ({getUtcOffsetLabel(tz)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {isEditing && (

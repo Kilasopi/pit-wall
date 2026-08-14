@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavBar } from '@/components/NavBar';
 import { useDrivers } from '@/hooks/useDrivers';
+import { getTimeZoneAbbreviation, getUtcOffsetLabel } from '@/hooks/useTimeZone';
 import { RELAY_HTTP_URL } from '@/lib/relay';
 import { AddRosterDriverForm } from '@/components/AddRosterDriverForm';
 import { Badge } from '@/components/ui/badge';
@@ -122,7 +123,7 @@ function RosterDriversCard() {
                   hour: '2-digit',
                   minute: '2-digit',
                 }).format(new Date());
-                return `${time} (${r.city ?? r.timezone})`;
+                return `${time} (${getTimeZoneAbbreviation(r.timezone)} ${getUtcOffsetLabel(r.timezone)})`;
               } catch {
                 return r.timezone;
               }

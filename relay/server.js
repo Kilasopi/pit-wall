@@ -22,7 +22,7 @@ const pool = new Pool({
 
 app.get('/api/murder-drivers', async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT id, name, nickname, iracing_id, active, city, country, timezone FROM murder_drivers ORDER BY name'
+        'SELECT id, name, nickname, iracing_id, active, timezone FROM murder_drivers ORDER BY name'
     );
     res.json(rows);
 });
@@ -196,13 +196,13 @@ app.patch('/api/entry-drivers/:id', async (req, res) => {
 });
 
 app.post('/api/murder-drivers', async (req, res) => {
-    const { name, nickname, iracingId, city, country, timezone } = req.body;
+    const { name, nickname, iracingId, timezone } = req.body;
 
     const { rows } = await pool.query(
-        `INSERT INTO murder_drivers (name, nickname, iracing_id, city, country, timezone)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO murder_drivers (name, nickname, iracing_id, timezone)
+        VALUES ($1, $2, $3, $4)
         RETURNING *`,
-        [name, nickname ?? null, iracingId ?? null, city ?? null, country ?? null, timezone ?? null]
+        [name, nickname ?? null, iracingId ?? null, timezone ?? null]
     )
     res.status(201).json(rows[0]);
 });
@@ -213,8 +213,6 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
             name,
             nickname,
             iracingId,
-            city,
-            country,
             timezone,
             active,
         } = req.body;
@@ -224,18 +222,14 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
              SET name = $1,
                  nickname = $2,
                  iracing_id = $3,
-                 city = $4,
-                 country = $5,
-                 timezone = $6,
-                 active = $7
-             WHERE id = $8
+                 timezone = $4,
+                 active = $5
+             WHERE id = $6
              RETURNING *`,
             [
                 name,
                 nickname ?? null,
                 iracingId ?? null,
-                city ?? null,
-                country ?? null,
                 timezone ?? null,
                 active,
                 req.params.id,

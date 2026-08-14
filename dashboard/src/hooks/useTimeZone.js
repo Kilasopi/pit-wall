@@ -34,6 +34,53 @@ export function getUtcOffsetLabel(timezone) {
     return offset; // e.g. "GMT-7"
 }
 
+// Browser ICU data only has letter abbreviations for North American zones —
+// everywhere else Intl's 'short' style falls back to a GMT+X offset (see the
+// zones below in COMMON_TIMEZONES). Standard/daylight pairs for those, so
+// zones that don't observe DST (Tokyo, Dubai, Perth...) just use one value.
+const ZONE_ABBREVIATIONS = {
+    'Pacific/Auckland': { standard: 'NZST', daylight: 'NZDT' },
+    'Australia/Sydney': { standard: 'AEST', daylight: 'AEDT' },
+    'Australia/Perth': { standard: 'AWST', daylight: 'AWST' },
+    'Asia/Tokyo': { standard: 'JST', daylight: 'JST' },
+    'Asia/Shanghai': { standard: 'CST', daylight: 'CST' },
+    'Asia/Kolkata': { standard: 'IST', daylight: 'IST' },
+    'Asia/Dubai': { standard: 'GST', daylight: 'GST' },
+    'Europe/Moscow': { standard: 'MSK', daylight: 'MSK' },
+    'Africa/Cairo': { standard: 'EET', daylight: 'EEST' },
+    'Europe/Stockholm': { standard: 'CET', daylight: 'CEST' },
+    'Europe/Paris': { standard: 'CET', daylight: 'CEST' },
+    'Europe/London': { standard: 'GMT', daylight: 'BST' },
+    'America/Sao_Paulo': { standard: 'BRT', daylight: 'BRT' },
+    'Pacific/Honolulu': { standard: 'HST', daylight: 'HST' },
+};
+
+// Zone abbreviation (e.g. "PDT" vs "PST") computed against the current
+// date, so it already reflects whether this specific IANA zone is
+// currently observing DST — no separate DST check needed. Falls back to the
+// map above for zones ICU doesn't have a letter code for, picking
+// standard/daylight by checking Intl's long form for "Summer"/"Daylight"
+// (works in both hemispheres, since Intl already knows this zone's DST
+// calendar for the given date).
+export function getTimeZoneAbbreviation(timezone) {
+    const shortParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        timeZoneName: 'short',
+    }).formatToParts(new Date());
+    const short = shortParts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+    if (/^[A-Z]+$/.test(short)) return short;
+
+    const pair = ZONE_ABBREVIATIONS[timezone];
+    if (!pair) return short || timezone;
+
+    const longParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        timeZoneName: 'long',
+    }).formatToParts(new Date());
+    const long = longParts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+    return /Summer|Daylight/i.test(long) ? pair.daylight : pair.standard;
+}
+
 function getDefaultTimezone() {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
