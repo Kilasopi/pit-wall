@@ -3,7 +3,8 @@ import RaceView from './pages/RaceView.jsx'
 import TeamSelectPage from './pages/TeamSelectPage.jsx'
 import SpectateRoot from './pages/SpectateRoot.jsx'
 import DriversPage from './pages/DriversPage.jsx'
-import StintPlannerPage from './pages/StintPlannerPage.jsx'
+import RacesPage from './pages/RacesPage.jsx'
+import RaceEventPage from './pages/Races-Pages/RaceEventPage.jsx'
 import ThemePreview from './pages/ThemePreview.jsx'
 import { isSpectateHost } from './lib/host.js'
 import Schedule from './pages/Schedule.jsx';
@@ -23,14 +24,16 @@ function App() {
         {spectateHost ? (
           <>
             <Route path="/drivers" element={<Navigate to="/" replace />} />
-            <Route path="/planner" element={<Navigate to="/" replace />} />
+            <Route path="/races" element={<Navigate to="/" replace />} />
+            <Route path="/races/:raceEventId/*" element={<Navigate to="/" replace />} />
             <Route path="/schedule" element={<Navigate to="/" replace />} />
-            
+
           </>
         ) : (
           <>
             <Route path="/drivers" element={<DriversPage />} />
-            <Route path="/planner" element={<StintPlannerPage />} />
+            <Route path="/races" element={<RacesPage />} />
+            <Route path="/races/:raceEventId/*" element={<RaceEventPage />} />
             <Route path="/schedule" element={<Schedule />} />
           </>
         )}

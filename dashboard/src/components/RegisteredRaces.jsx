@@ -1,5 +1,6 @@
 import { RELAY_HTTP_URL } from '@/lib/relay';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   CardHeader,
@@ -29,6 +30,7 @@ function getRegisteredRaces() {
 
 export function RegisteredRaces() {
     const registeredRaces = getRegisteredRaces();
+    const navigate = useNavigate();
 
     return(
         <Card>
@@ -38,7 +40,10 @@ export function RegisteredRaces() {
             <CardContent>
                 {registeredRaces.map((r) => {
                     return (
-                        <Card key={r.race_event_id} className={"mb-2"}>
+                        <Card key={r.race_event_id}
+                            onClick={() => navigate(`/races/${r.race_event_id}`)}
+                            className={`mb-2 cursor-pointer transition-colors hover:bg-accent/50 ${r.source === 'special_event' ? 'border border-blue-500 bg-blue-950/40' : ''}`}
+                            >
                             <CardHeader>
                                 <CardTitle>
                                     {r.event_name}

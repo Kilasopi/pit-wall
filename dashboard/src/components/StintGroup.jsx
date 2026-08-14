@@ -1,6 +1,4 @@
 import { useRef, useState } from 'react';
-import { NavBar } from '@/components/NavBar';
-import { useDrivers } from '@/hooks/useDrivers';
 import { RELAY_HTTP_URL } from '@/lib/relay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,30 +11,11 @@ import {
   CardAction,
   CardContent,
 } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import { carTypeImage } from '@/lib/carTypes';
 
-const DEFAULT_STINT_MINUTES = 60;
+export const DEFAULT_STINT_MINUTES = 60;
 
-function groupEntries(rows) {
-  const groups = new Map();
-  for (const row of rows) {
-    const key = `${row.event_name}|||${row.entry_name}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        key,
-        eventName: row.event_name,
-        entryName: row.entry_name,
-        carType: row.car_type ?? null,
-        drivers: [],
-      });
-    }
-    groups.get(key).drivers.push(row);
-  }
-  return [...groups.values()];
-}
-
-function uniqueDrivers(drivers) {
+export function uniqueDrivers(drivers) {
   const seen = new Set();
   const result = [];
   for (const d of drivers) {
@@ -121,7 +100,7 @@ function formatDuration(minutes) {
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(' ');
 }
 
-function StintGroup({ group }) {
+export function StintGroup({ group }) {
   const raceStartAt = group.drivers[0]?.race_start_at ?? null;
   const [localStart, setLocalStart] = useState(
     raceStartAt ? toDatetimeLocalValue(new Date(raceStartAt)) : ''
@@ -290,7 +269,6 @@ function StintGroup({ group }) {
       : null;
 
   return (
-    
     <Card>
       <CardHeader>
         <CardTitle>{group.entryName}</CardTitle>
@@ -493,56 +471,3 @@ function StintGroup({ group }) {
     </Card>
   );
 }
-
-function StintPlannerPage() {
-  const { data, loading } = useDrivers('entry-drivers');
-  const groups = groupEntries(data);
-  const [activeKey, setActiveKey] = useState(null);
-
-  const activeGroup = groups.find((g) => g.key === activeKey) ?? groups[0] ?? null;
-
-  return (
-    <div className="min-h-screen bg-background p-6 text-foreground">
-      <div className="mb-2 flex items-center justify-between">
-        <h1 className="text-xl font-heading font-medium">Stint Planner</h1>
-      </div>
-      <NavBar />
-
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No entry drivers yet — add some on the Drivers page first.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {groups.length > 1 && (
-            <div className="flex flex-wrap gap-2 border-b pb-2">
-              {groups.map((group) => (
-                <button
-                  key={group.key}
-                  onClick={() => setActiveKey(group.key)}
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                    activeGroup?.key === group.key
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted'
-                  )}
-                >
-                  {carTypeImage(group.carType) && (
-                    <img src={carTypeImage(group.carType)} alt="" className="h-5 w-auto" />
-                  )}
-                  {group.entryName}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {activeGroup && <StintGroup key={activeGroup.key} group={activeGroup} />}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default StintPlannerPage;

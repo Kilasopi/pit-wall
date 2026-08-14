@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 const links = [
   { to: '/', label: 'Race View' },
   { to: '/drivers', label: 'Drivers' },
-  { to: '/planner', label: 'Stint Planner' },
+  { to: '/races', label: 'Races' },
   { to: '/schedule', label: 'Schedule' },
 ];
 

@@ -33,7 +33,11 @@ export function EventSignups({ raceEventId, carClasses }) {
                 <div key={carClass} className="mb-1 flex flex-wrap items-center gap-1 text-sm">
                     <span className="text-sm text-muted-foreground">{carClass}:</span>
                     {group.map((s) => (
-                        <Badge key={s.id} variant="secondary" className="h-7 gap-1 pr-1 text-sm">
+                        <Badge
+                            key={s.id}
+                            variant={s.driver_id ? "secondary" : "outline"}
+                            className={`h-7 gap-1 pr-1 text-sm ${!s.driver_id ? "border-amber-500 text-amber-600" : ""}`}
+                            >
                             {labelFor(s)}
                             <Button
                                 type="button"

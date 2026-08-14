@@ -481,6 +481,98 @@ app.delete('/api/race-event-signups/:id', async (req, res) => {
     res.status(204).end();
 });
 
+app.get('/api/race-events/:id/teams', async (req, res) => {
+    const [teamRows, unassignedRows] = await Promise.all([
+        pool.query(
+            `SELECT
+                 t.id AS team_id, t.name AS team_name, t.car_class,
+                 s.id AS signup_id, s.driver_id, s.guest_name, s.guest_iracing_id,
+                 d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id
+             FROM race_event_teams t
+             LEFT JOIN race_event_team_members m ON m.team_id = t.id
+             LEFT JOIN race_event_signups s ON s.id = m.signup_id
+             LEFT JOIN murder_drivers d ON d.id = s.driver_id
+             WHERE t.race_event_id = $1
+             ORDER BY t.id`,
+            [req.params.id]
+        ),
+        pool.query(
+            `SELECT s.id AS signup_id, s.car_class, s.driver_id, s.guest_name, s.guest_iracing_id,
+                    d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id
+             FROM race_event_signups s
+             LEFT JOIN murder_drivers d ON d.id = s.driver_id
+             LEFT JOIN race_event_team_members m ON m.signup_id = s.id
+             WHERE s.race_event_id = $1 AND m.id IS NULL`,
+            [req.params.id]
+        ),
+    ]);
+
+    const teams = [];
+    const byId = new Map();
+    for (const row of teamRows.rows) {
+        if (!byId.has(row.team_id)) {
+            const team = { id: row.team_id, name: row.team_name, car_class: row.car_class, members: [] };
+            byId.set(row.team_id, team);
+            teams.push(team);
+        }
+        if (row.signup_id) {
+            byId.get(row.team_id).members.push({
+                signup_id: row.signup_id,
+                driver_id: row.driver_id,
+                name: row.driver_name ?? row.guest_name,
+                nickname: row.driver_nickname,
+                iracing_id: row.iracing_id ?? row.guest_iracing_id,
+            });
+        }
+    }
+
+    res.json({ teams, unassigned: unassignedRows.rows });
+});
+
+app.post('/api/race-events/:id/teams', async (req, res) => {
+    const { carClass, name } = req.body;
+
+    const { rows } = await pool.query(
+        `INSERT INTO race_event_teams (race_event_id, car_class, name)
+        VALUES ($1, $2, $3)
+        RETURNING *`,
+        [req.params.id, carClass, name]
+    );
+
+    res.status(201).json(rows[0]);
+});
+
+app.post('/api/teams/:teamId/join', async (req, res) => {
+    try {
+        const { signupId } = req.body;
+
+        const { rows } = await pool.query(
+            `INSERT INTO race_event_team_members (team_id, signup_id)
+            VALUES ($1, $2)
+            RETURNING *`,
+            [req.params.teamId, signupId]
+        );
+        console.log('Driver added to team');
+        res.status(201).json(rows[0]);
+    } catch(err) {
+        if (err.code === '23505') {
+            return res.status(409).json({ error: 'Signup already on a team' });
+        }
+        console.error('Failed to add driver to team:', err.message);
+        res.status(500).json({ error: 'Failed to add driver to team' });
+    }
+});
+
+app.delete('/api/teams/:teamId', async (req, res) => {
+    await pool.query('DELETE FROM race_event_teams WHERE id = $1', [req.params.teamId]);
+    res.status(204).end();
+});
+
+app.delete('/api/team-members/:signupId', async (req, res) => {
+    await pool.query('DELETE FROM race_event_team_members WHERE signup_id = $1', [req.params.signupId]);
+    res.status(204).end();
+})
+
 app.get('/api/registered-races', async (req,res) => {
     const { rows } = await pool.query(`
         SELECT
