@@ -123,7 +123,7 @@ export function RaceEventSignupForm({ raceEventId, carClasses, onAdded, onCancel
                     <SelectContent>
                         {rosterDrivers.map((d) => (
                             <SelectItem key={d.id} value={String(d.id)}>
-                                {d.nickname ? `${d.nickname} | ${d.name}` : d.name}
+                                {d.nickname ? `${d.name} | ${d.nickname}` : d.name}
                             </SelectItem>
                         ))}
                         <SelectItem value="guest">Guest Driver</SelectItem>

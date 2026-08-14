@@ -238,6 +238,7 @@ function Schedule() {
                                             </span>
                                         )}
                                     </p>
+                                    <p>Location: {event.track}</p>
                                     {event.distanceKm && <p>Distance: {event.distanceKm}km</p>}
                                     {event.lengthMinutes && (
                                         <p>

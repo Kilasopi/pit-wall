@@ -354,13 +354,13 @@ async function saveSpecialEvents(results) {
         const raceSeriesId = rows[0].id;
 
         const { rows: eventRows } = await pool.query(
-            `INSERT INTO race_events (name, race_series_id, week, length_minutes, distance_km, event_start_date, event_end_date)
-             VALUES ($1, $2, 1, $3, $4, $5, $6)
-             ON CONFLICT (race_series_id, week)
-             DO UPDATE SET length_minutes = EXCLUDED.length_minutes, distance_km = EXCLUDED.distance_km,
+            `INSERT INTO race_events (name, track, race_series_id, week, length_minutes, distance_km, event_start_date, event_end_date)
+            VALUES ($1, $2, $3, 1, $4, $5, $6, $7)
+            ON CONFLICT (race_series_id, week)
+            DO UPDATE SET track = EXCLUDED.track, length_minutes = EXCLUDED.length_minutes, distance_km = EXCLUDED.distance_km,
                 event_start_date = EXCLUDED.event_start_date, event_end_date = EXCLUDED.event_end_date
-             RETURNING id`,
-            [event.name, raceSeriesId, event.lengthMinutes, event.distanceKm, event.dateRange?.start ?? null, event.dateRange?.end ?? null]
+            RETURNING id`,
+            [event.name, event.track, raceSeriesId, event.lengthMinutes, event.distanceKm, event.dateRange?.start ?? null, event.dateRange?.end ?? null]
         );
         const raceEventId = eventRows[0].id;
 
@@ -372,6 +372,18 @@ async function saveSpecialEvents(results) {
                 [raceEventId, timeslot]
             );
         }
+    }
+
+    // Events that dropped out of the current scrape (filtered out, or
+    // genuinely removed from the listing page) shouldn't linger in the DB.
+    // Guarded against an empty result set so a failed/partial scrape can't
+    // wipe every special event.
+    if (results.length > 0) {
+        const currentNames = results.map((e) => e.name);
+        await pool.query(
+            `DELETE FROM race_series WHERE source = 'special_event' AND name != ALL($1::text[])`,
+            [currentNames]
+        );
     }
 }
 
@@ -392,7 +404,7 @@ setInterval(refreshSpecialEvents, SPECIAL_EVENTS_REFRESH_MS);
 
 app.get('/api/special-events', async (req, res) => {
     const { rows: events } = await pool.query(
-        `SELECT re.id, rs.name, rs.car_classes, re.length_minutes, re.distance_km,
+        `SELECT re.id, rs.name, rs.car_classes, re.track, re.length_minutes, re.distance_km,
                 re.event_start_date, re.event_end_date
          FROM race_events re
          JOIN race_series rs ON rs.id = re.race_series_id
@@ -411,6 +423,7 @@ app.get('/api/special-events', async (req, res) => {
         id: e.id,
         name: e.name,
         carClasses: e.car_classes,
+        track: e.track,
         lengthMinutes: e.length_minutes,
         distanceKm: e.distance_km,
         dateRange: e.event_start_date ? { start: e.event_start_date, end: e.event_end_date } : null,
@@ -466,4 +479,46 @@ app.patch('/api/race-event-signups/:id', async (req, res) => {
 app.delete('/api/race-event-signups/:id', async (req, res) => {
     await pool.query('DELETE FROM race_event_signups WHERE id = $1', [req.params.id]);
     res.status(204).end();
+});
+
+app.get('/api/registered-races', async (req,res) => {
+    const { rows } = await pool.query(`
+        SELECT
+            re.id AS race_event_id,
+            re.name AS event_name,
+            re.track,
+            re.week,
+            re.length_minutes,
+            re.distance_km,
+            re.event_start_date,
+            re.event_end_date,
+            rs.id AS race_series_id,
+            rs.name AS series_name,
+            rs.source,
+            s.car_class,
+            COUNT(s.id)::int AS signup_count
+        FROM race_event_signups s
+        JOIN race_events re
+            ON re.id = s.race_event_id
+        JOIN race_series rs
+            ON rs.id = re.race_series_id
+        GROUP BY
+            re.id,
+            re.name,
+            re.track,
+            re.week,
+            re.length_minutes,
+            re.event_start_date,
+            re.event_end_date,
+            rs.id,
+            rs.name,
+            rs.source,
+            s.car_class
+        ORDER BY
+            re.event_start_date NULLS LAST,
+            re.id,
+            s.car_class
+    `);
+
+    res.json(rows);
 });

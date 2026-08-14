@@ -5,6 +5,7 @@ import { RELAY_HTTP_URL } from '@/lib/relay';
 import { AddRosterDriverForm } from '@/components/AddRosterDriverForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { RegisteredRaces } from '@/components/RegisteredRaces';
 import {
   Card,
   CardHeader,
@@ -176,6 +177,7 @@ function DriversPage() {
 
       <div className="grid items-start gap-4 md:grid-cols-2">
         <RosterDriversCard />
+        <RegisteredRaces />
       </div>
     </div>
   );

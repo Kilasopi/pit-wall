@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 function labelFor(signup) {
-    return signup.driver_id ? (signup.driver_nickname || signup.driver_name) : signup.guest_name;
+    if (!signup.driver_id) return signup.guest_name;
+
+    return signup.driver_nickname
+        ? `${signup.driver_name} | ${signup.driver_nickname}`
+        : signup.driver_name;
 }
 
 export function EventSignups({ raceEventId, carClasses }) {
