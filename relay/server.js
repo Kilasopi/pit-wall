@@ -497,12 +497,26 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
             [req.params.id]
         ),
         pool.query(
+            // A driver counts as "assigned" the moment ANY of their signups for
+            // this event is on a team — not just the specific signup being
+            // checked — so joining a team in one class removes them from every
+            // other class's unassigned pool too. Guests have no driver_id, so
+            // they're only matched against their own exact signup.
             `SELECT s.id AS signup_id, s.car_class, s.driver_id, s.guest_name, s.guest_iracing_id,
                     d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id
              FROM race_event_signups s
              LEFT JOIN murder_drivers d ON d.id = s.driver_id
-             LEFT JOIN race_event_team_members m ON m.signup_id = s.id
-             WHERE s.race_event_id = $1 AND m.id IS NULL`,
+             WHERE s.race_event_id = $1
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM race_event_team_members m
+                   JOIN race_event_signups s2 ON s2.id = m.signup_id
+                   WHERE s2.race_event_id = s.race_event_id
+                     AND (
+                         (s.driver_id IS NOT NULL AND s2.driver_id = s.driver_id)
+                         OR (s.driver_id IS NULL AND s2.id = s.id)
+                     )
+               )`,
             [req.params.id]
         ),
     ]);
@@ -545,6 +559,31 @@ app.post('/api/race-events/:id/teams', async (req, res) => {
 app.post('/api/teams/:teamId/join', async (req, res) => {
     try {
         const { signupId } = req.body;
+
+        const { rows: signupRows } = await pool.query(
+            'SELECT race_event_id, driver_id FROM race_event_signups WHERE id = $1',
+            [signupId]
+        );
+        const signup = signupRows[0];
+        if (!signup) return res.status(404).json({ error: 'Signup not found' });
+
+        // Same driver-level check as the unassigned query: block joining a
+        // second team if this driver already has a team via any of their
+        // other signups for this event.
+        const { rows: conflictRows } = await pool.query(
+            `SELECT m.id
+             FROM race_event_team_members m
+             JOIN race_event_signups s ON s.id = m.signup_id
+             WHERE s.race_event_id = $1
+               AND (
+                   ($2::int IS NOT NULL AND s.driver_id = $2)
+                   OR ($2::int IS NULL AND m.signup_id = $3)
+               )`,
+            [signup.race_event_id, signup.driver_id, signupId]
+        );
+        if (conflictRows.length > 0) {
+            return res.status(409).json({ error: 'Driver already on a team for this event' });
+        }
 
         const { rows } = await pool.query(
             `INSERT INTO race_event_team_members (team_id, signup_id)

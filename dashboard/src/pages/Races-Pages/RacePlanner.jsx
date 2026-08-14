@@ -44,6 +44,18 @@ function RacePlanner() {
         fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}`, { method: 'DELETE' }).then(refetch);
     }
 
+    function groupUnassignedByDriver(rows) {
+        const groups = new Map();
+        for (const u of rows) {
+            const key = u.driver_id ? `driver:${u.driver_id}` : `guest:${u.guest_name}`;
+            if (!groups.has(key)) {
+                groups.set(key, { name: u.driver_name || u.guest_name, signups: [] });
+            }
+            groups.get(key).signups.push(u);
+        }
+        return [...groups.values()];
+    }
+
     const [newTeamClass, setNewTeamClass] = useState('');
     const [newTeamName, setNewTeamName] = useState('');
     const availableClasses = [...new Set([...unassigned.map((u) => u.car_class), ...teams.map((t) => t.car_class)])];
@@ -140,14 +152,16 @@ function RacePlanner() {
                                     <CardTitle>Unasigned Drivers</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    {unassigned.map((u) => (
-                                        <div key={u.signup_id} className="flex items-center gap-2">
-                                            <p>{u.driver_name || u.guest_name}</p>
-                                            {teams.filter(t => t.car_class === u.car_class).map(t => (
-                                                <Button key={t.id} variant="outline" size="sm" onClick={() => joinTeam(t.id, u.signup_id)}>
-                                                    Join {t.name}
-                                                </Button>
-                                            ))}
+                                    {groupUnassignedByDriver(unassigned).map((driver) => (
+                                        <div key={driver.signups[0].signup_id} className="flex items-center gap-2">
+                                            <p>{driver.name}</p>
+                                            {driver.signups.flatMap((u) =>
+                                                teams.filter(t => t.car_class === u.car_class).map(t => (
+                                                    <Button key={t.id} variant="outline" size="sm" onClick={() => joinTeam(t.id, u.signup_id)}>
+                                                        Join {t.name} ({u.car_class})
+                                                    </Button>
+                                                ))
+                                            )}
                                         </div>
                                     ))}
                                 </CardContent>

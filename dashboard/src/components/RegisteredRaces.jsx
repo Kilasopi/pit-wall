@@ -28,9 +28,21 @@ function getRegisteredRaces() {
     return races
 }
 
+function groupByEvent(rows) {
+    const byEvent = rows.reduce((acc, r) => {
+        (acc[r.race_event_id] ??= { ...r, classes: [] }).classes.push({
+            car_class: r.car_class,
+            signup_count: r.signup_count,
+        });
+        return acc;
+    }, {});
+    return Object.values(byEvent);
+}
+
 export function RegisteredRaces() {
     const registeredRaces = getRegisteredRaces();
     const navigate = useNavigate();
+    const events = groupByEvent(registeredRaces);
 
     return(
         <Card>
@@ -38,7 +50,8 @@ export function RegisteredRaces() {
                 <CardTitle>Registered Races</CardTitle>
             </CardHeader>
             <CardContent>
-                {registeredRaces.map((r) => {
+                {events.map((r) => {
+                    const totalRegistrations = r.classes.reduce((sum, c) => sum + c.signup_count, 0);
                     return (
                         <Card key={r.race_event_id}
                             onClick={() => navigate(`/races/${r.race_event_id}`)}
@@ -49,7 +62,7 @@ export function RegisteredRaces() {
                                     {r.event_name}
                                 </CardTitle>
                                 <CardDescription>
-                                    {r.car_class}
+                                    {r.classes.map((c) => c.car_class).join(', ')}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -60,7 +73,12 @@ export function RegisteredRaces() {
                                         Length: {Math.floor(r.length_minutes / 60)}h{r.length_minutes % 60 !== 0 && ` ${r.length_minutes % 60}m`}
                                     </p>
                                 )}
-                                <p>Registrations: {r.signup_count}</p>
+                                <p>Registrations: {totalRegistrations} total</p>
+                                <ul className="text-sm text-muted-foreground">
+                                    {r.classes.map((c) => (
+                                        <li key={c.car_class}>{c.car_class}: {c.signup_count}</li>
+                                    ))}
+                                </ul>
                             </CardContent>
                         </Card>
                     )
