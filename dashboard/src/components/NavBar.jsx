@@ -6,6 +6,7 @@ import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { useRelaySocket } from '@/hooks/useRelaySocket';
 import { useTeamSlugs } from '@/hooks/useTeamSlugs';
 import { Badge } from '@/components/ui/badge';
+import { RELAY_HTTP_URL } from '@/lib/relay';
 
 // Only ever rendered on the crew (pitwall) host — the spectate host
 // renders SpectateRoot/Spectate.jsx directly with no nav chrome at all.
@@ -31,6 +32,11 @@ export function NavBar() {
   const agent = useAgentSocket(teamId);
   const relay = useRelaySocket();
 
+  const clearSessionHistory = () => {
+    if (!confirm('Clear all stint, fuel, and incident history? This cannot be undone.')) return;
+    fetch(`${RELAY_HTTP_URL}/api/session-history`, { method: 'DELETE' });
+  };
+
   return (
     <nav className="mb-6 flex flex-col gap-3 border-b pb-3">
       <div className="flex flex-wrap items-center gap-2 self-end">
@@ -46,6 +52,13 @@ export function NavBar() {
         <Badge variant={agent.inIracingSession ? 'default' : 'destructive'}>
           {agent.inIracingSession ? 'In iRacing Session' : 'Not In iRacing Session'}
         </Badge>
+        <button
+          type="button"
+          onClick={clearSessionHistory}
+          className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Clear Session History
+        </button>
       </div>
 
       <div className="flex items-center justify-between gap-4">

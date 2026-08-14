@@ -98,6 +98,16 @@ app.delete('/api/entry-drivers', async (req, res) => {
     res.status(204).end();
 });
 
+// Wipes stint/fuel/incident history once it's no longer needed (e.g. after
+// a test session) instead of letting it sit around and get mistaken for
+// current data. fuel_readings first since it FKs to stints.
+app.delete('/api/session-history', async (req, res) => {
+    await pool.query('DELETE FROM fuel_readings');
+    await pool.query('DELETE FROM stints');
+    await pool.query('DELETE FROM incidents');
+    res.status(204).end();
+});
+
 // Adds another stint slot for the same driver (used for double/triple
 // stinting), appended to the end of that entry's schedule.
 app.post('/api/entry-drivers/:id/duplicate', async (req, res) => {
