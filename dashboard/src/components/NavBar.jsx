@@ -7,6 +7,7 @@ import { useRelaySocket } from '@/hooks/useRelaySocket';
 import { useTeamSlugs } from '@/hooks/useTeamSlugs';
 import { Badge } from '@/components/ui/badge';
 import { RELAY_HTTP_URL } from '@/lib/relay';
+import { Button } from '@/components/ui/button';
 
 // Only ever rendered on the crew (pitwall) host — the spectate host
 // renders SpectateRoot/Spectate.jsx directly with no nav chrome at all.
@@ -52,13 +53,13 @@ export function NavBar() {
         <Badge variant={agent.inIracingSession ? 'default' : 'destructive'}>
           {agent.inIracingSession ? 'In iRacing Session' : 'Not In iRacing Session'}
         </Badge>
-        <button
+        <Button
           type="button"
           onClick={clearSessionHistory}
           className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           Clear Session History
-        </button>
+        </Button>
       </div>
 
       <div className="flex items-center justify-between gap-4">
