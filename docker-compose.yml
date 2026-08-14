@@ -1,13 +1,14 @@
 # Work PC stack only — relay, agent, dashboard. Postgres is Neon (managed,
-# see relay/.env and agent/.env) so drivers/stints/incidents persist across
-# every device hitting the tunnel, not just this machine. The collector is
+# see the root .env) so drivers/stints/incidents persist across every
+# device hitting the tunnel, not just this machine. The collector is
 # intentionally not here either: it has to run natively on the Sim PC's
 # Windows install to reach iRacing's shared memory directly, which Docker
 # doesn't help with and only adds friction to.
 #
-# DATABASE_URL below comes from a root-level .env (gitignored — see
-# .env.example) that Compose loads automatically for variable substitution;
-# it's the same Neon connection string as relay/.env and agent/.env.
+# DATABASE_URL/JWT_SECRET/etc below come from the root-level .env (gitignored
+# — see .env.example) that Compose loads automatically for variable
+# substitution; relay/agent read that same file directly when run outside
+# Docker.
 services:
   relay:
     build: ./relay
@@ -16,6 +17,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PORT: 4000
+      JWT_SECRET: ${JWT_SECRET}
 
     develop:
       watch:

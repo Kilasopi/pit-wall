@@ -1,4 +1,4 @@
-require('dotenv').config({ path: __dirname + '/.env' });
+require('dotenv').config({ path: __dirname + '/../.env' });
 const express = require('express');
 const cors = require('cors');
 const cheerio = require('cheerio');
@@ -486,7 +486,7 @@ app.delete('/api/race-event-signups/:id', async (req, res) => {
 });
 
 app.get('/api/race-events/:id/teams', async (req, res) => {
-    const [teamRows, unassignedRows] = await Promise.all([
+    const [teamRows, unassignedRows, timeslotRows, voteRows] = await Promise.all([
         pool.query(
             `SELECT
                  t.id AS team_id, t.name AS team_name, t.car_class,
@@ -523,6 +523,17 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
                )`,
             [req.params.id]
         ),
+        pool.query(
+            'SELECT id, start_at FROM race_event_timeslots WHERE race_event_id = $1 ORDER BY start_at',
+            [req.params.id]
+        ),
+        pool.query(
+            `SELECT v.timeslot_id, v.team_id, v.signup_id
+             FROM race_event_timeslot_votes v
+             JOIN race_event_timeslots ts ON ts.id = v.timeslot_id
+             WHERE ts.race_event_id = $1`,
+            [req.params.id]
+        ),
     ]);
 
     const teams = [];
@@ -543,8 +554,16 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
             });
         }
     }
+    const votesByTeam = {};
+    for (const v of voteRows.rows) {
+        (votesByTeam[v.team_id] ??= {});
+        (votesByTeam[v.team_id][v.timeslot_id] ??= []).push(v.signup_id);
+    }
+    for (const team of teams) {
+        team.votes = votesByTeam[team.id] ?? {};
+    }
 
-    res.json({ teams, unassigned: unassignedRows.rows });
+    res.json({ teams, unassigned: unassignedRows.rows, timeslots: timeslotRows.rows });
 });
 
 app.post('/api/race-events/:id/teams', async (req, res) => {
