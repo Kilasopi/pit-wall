@@ -148,7 +148,7 @@ const server = app.listen(process.env.PORT || 4000, () =>
     console.log(`Relay listening on ${server.address().port}`)
 );
 
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, path: '/ws-relay' });
 let latestState = null;
 
 wss.on('connection', (ws) => {
@@ -174,13 +174,13 @@ function broadcastToDashboards(state) {
 // =======
 
 app.post('/api/entry-drivers', async (req,res) => {
-    const { driverId, guestName, eventName, entryName, carNumber, carType, stintMinutes } = req.body;
+    const { driverId, guestName, eventName, entryName, carNumber, carType, stintMinutes, teamId } = req.body;
 
     const { rows } = await pool.query(
-        `INSERT INTO entry_drivers (driver_id, guest_name, event_name, entry_name, car_number, car_type, stint_minutes)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO entry_drivers (driver_id, guest_name, event_name, entry_name, car_number, car_type, stint_minutes, team_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *`,
-        [driverId ?? null, guestName ?? null, eventName, entryName, carNumber ?? null, carType ?? null, stintMinutes ?? null]
+        [driverId ?? null, guestName ?? null, eventName, entryName, carNumber ?? null, carType ?? null, stintMinutes ?? null, teamId ?? null]
     )
     res.status(201).json(rows[0]);
 });
@@ -566,7 +566,7 @@ app.get('/api/special-events', async (req, res) => {
 
 app.get('/api/race-events/:id/signups', async (req, res) => {
     const { rows } = await pool.query(
-        `SELECT s.*, d.name AS driver_name, d.nickname AS driver_nickname
+        `SELECT s.*, d.name AS driver_name, d.nickname AS driver_nickname, d.timezone AS driver_timezone
          FROM race_event_signups s
          LEFT JOIN murder_drivers d ON d.id = s.driver_id
          WHERE s.race_event_id = $1
@@ -637,15 +637,16 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
     const [teamRows, unassignedRows, timeslotRows, voteRows, carVoteRows] = await Promise.all([
         pool.query(
             `SELECT
-                 t.id AS team_id, t.name AS team_name, t.car_class,
-                 s.id AS signup_id, s.driver_id, s.guest_name, s.guest_iracing_id, s.guest_timezone,
-                 d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id, d.timezone AS driver_timezone
-             FROM race_event_teams t
-             LEFT JOIN race_event_team_members m ON m.team_id = t.id
-             LEFT JOIN race_event_signups s ON s.id = m.signup_id
-             LEFT JOIN murder_drivers d ON d.id = s.driver_id
-             WHERE t.race_event_id = $1
-             ORDER BY t.id`,
+                t.id AS team_id, t.name AS team_name, t.car_class,
+                t.locked_timeslot_id, t.locked_car_name,
+                s.id AS signup_id, s.driver_id, s.guest_name, s.guest_iracing_id, s.guest_timezone,
+                d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id, d.timezone AS driver_timezone
+            FROM race_event_teams t
+            LEFT JOIN race_event_team_members m ON m.team_id = t.id
+            LEFT JOIN race_event_signups s ON s.id = m.signup_id
+            LEFT JOIN murder_drivers d ON d.id = s.driver_id
+            WHERE t.race_event_id = $1
+            ORDER BY t.id`,
             [req.params.id]
         ),
         pool.query(
@@ -695,7 +696,14 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
     const byId = new Map();
     for (const row of teamRows.rows) {
         if (!byId.has(row.team_id)) {
-            const team = { id: row.team_id, name: row.team_name, car_class: row.car_class, members: [] };
+            const team = {
+                id: row.team_id,
+                name: row.team_name,
+                car_class: row.car_class,
+                locked_timeslot_id: row.locked_timeslot_id,
+                locked_car_name: row.locked_car_name,
+                members: [],
+            };
             byId.set(row.team_id, team);
             teams.push(team);
         }
@@ -854,7 +862,7 @@ app.post('/api/teams/:teamId/car-votes', requireAuth, async (req, res) => {
         const { rows } = await pool.query(
             `INSERT INTO race_event_car_votes (team_id, signup_id, car_name)
             VALUES ($1, $2, $3)
-            ON CONFLICT (team_id, signup_id) DO UPDATE SET car_name = excluded.car_name, voted_at = now()
+            ON CONFLICT (team_id, signup_id, car_name) DO UPDATE SET voted_at = now()
             RETURNING *`,
             [req.params.teamId, signupId, carName]
         );
@@ -865,12 +873,142 @@ app.post('/api/teams/:teamId/car-votes', requireAuth, async (req, res) => {
     }
 });
 
-app.delete('/api/teams/:teamId/car-votes/:signupId', requireAuth, async (req, res) => {
+app.delete('/api/teams/:teamId/car-votes/:signupId/:carName', requireAuth, async (req, res) => {
     await pool.query(
-        `DELETE FROM race_event_car_votes WHERE team_id = $1 AND signup_id = $2`,
-        [req.params.teamId, req.params.signupId]
+        `DELETE FROM race_event_car_votes WHERE team_id = $1 AND signup_id = $2 AND car_name = $3`,
+        [req.params.teamId, req.params.signupId, req.params.carName]
     );
     res.status(204).end();
+});
+
+app.post('/api/teams/:teamId/lock-car', requireAuth, async (req, res) => {
+    try {
+        const { carName } = req.body;
+        const { rows } = await pool.query(
+            `UPDATE race_event_teams SET locked_car_name = $1 WHERE id = $2 RETURNING *`,
+            [carName, req.params.teamId]
+        );
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('Failed to lock car:', err.message);
+        res.status(500).json({ error: 'Failed to lock car' });
+    }
+});
+
+app.post('/api/teams/:teamId/lock-timeslot', requireAuth, async (req, res) => {
+    try {
+        const { timeslotId } = req.body;
+        const { teamId } = req.params;
+
+        const { rows } = await pool.query(
+            `UPDATE race_event_teams t
+             SET locked_timeslot_id = $1,
+                 race_start_at = ts.start_at,
+                 race_length_minutes = re.length_minutes
+             FROM race_event_timeslots ts, race_events re
+             WHERE t.id = $2
+               AND ts.id = $1
+               AND re.id = t.race_event_id
+             RETURNING t.*`,
+            [timeslotId, teamId]
+        );
+
+        if (!rows[0]) return res.status(404).json({ error: 'Team or timeslot not found' });
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('Failed to lock timeslot:', err.message);
+        res.status(500).json({ error: 'Failed to lock timeslot' });
+    }
+});
+
+app.delete('/api/teams/:teamId/lock-car', requireAuth, async (req, res) => {
+    await pool.query(
+        `UPDATE race_event_teams SET locked_car_name = NULL WHERE id = $1`,
+        [req.params.teamId]
+    );
+    res.status(204).end();
+});
+
+app.delete('/api/teams/:teamId/lock-timeslot', requireAuth, async (req, res) => {
+    await pool.query(
+        `UPDATE race_event_teams
+         SET locked_timeslot_id = NULL,
+             race_start_at = NULL,
+             race_length_minutes = NULL
+         WHERE id = $1`,
+        [req.params.teamId]
+    );
+    res.status(204).end();
+});
+
+app.get('/api/teams/:teamId/entry-drivers', requireAuth, async (req, res) => {
+    try {
+        const { rows } = await pool.query(
+            `SELECT ed.id, ed.team_id, ed.driver_id, ed.guest_name,
+                    COALESCE(md.name, ed.guest_name) AS driver_name,
+                    ed.driver_id IS NULL AS is_guest,
+                    md.timezone,
+                    ed.event_name, ed.entry_name, ed.car_number, ed.car_type,
+                    ed.stint_order, ed.stint_minutes
+             FROM entry_drivers ed
+             LEFT JOIN murder_drivers md ON md.id = ed.driver_id
+             WHERE ed.team_id = $1
+             ORDER BY ed.stint_order NULLS LAST`,
+            [req.params.teamId]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('Failed to load entry drivers for team:', err.message);
+        res.status(500).json({ error: 'Failed to load entry drivers' });
+    }
+});
+
+app.get('/api/teams/:teamId/roster', requireAuth, async (req, res) => {
+    const { rows } = await pool.query(
+        `SELECT s.id AS signup_id, s.driver_id, s.guest_name,
+                COALESCE(md.name, s.guest_name) AS driver_name,
+                s.driver_id IS NULL AS is_guest,
+                md.timezone
+         FROM race_event_team_members m
+         JOIN race_event_signups s ON s.id = m.signup_id
+         LEFT JOIN murder_drivers md ON md.id = s.driver_id
+         WHERE m.team_id = $1
+         ORDER BY driver_name`,
+        [req.params.teamId]
+    );
+    res.json(rows);
+});
+
+app.get('/api/teams/:teamId', requireAuth, async (req, res) => {
+    const { rows } = await pool.query(
+        `SELECT t.id, t.name, t.car_class, t.race_start_at, t.race_length_minutes,
+                t.practice_minutes, t.quali_minutes, t.locked_car_name, t.locked_timeslot_id,
+                t.quali_signup_id,
+                COALESCE(md.name, s.guest_name) AS quali_driver_name
+         FROM race_event_teams t
+         LEFT JOIN race_event_signups s ON s.id = t.quali_signup_id
+         LEFT JOIN murder_drivers md ON md.id = s.driver_id
+         WHERE t.id = $1`,
+        [req.params.teamId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Team not found' });
+    res.json(rows[0]);
+});
+
+app.patch('/api/teams/:teamId/race-settings', requireAuth, async (req, res) => {
+    const { raceStartAt, raceLengthMinutes, practiceMinutes, qualiMinutes, qualiSignupId } = req.body;
+    const { rows } = await pool.query(
+        `UPDATE race_event_teams
+         SET race_start_at = COALESCE($1, race_start_at),
+             race_length_minutes = COALESCE($2, race_length_minutes),
+             practice_minutes = COALESCE($3, practice_minutes),
+             quali_minutes = COALESCE($4, quali_minutes),
+             quali_signup_id = COALESCE($5, quali_signup_id)
+         WHERE id = $6
+         RETURNING *`,
+        [raceStartAt ?? null, raceLengthMinutes ?? null, practiceMinutes ?? null, qualiMinutes ?? null, qualiSignupId ?? null, req.params.teamId]
+    );
+    res.json(rows[0]);
 });
 
 app.get('/api/registered-races', async (req,res) => {

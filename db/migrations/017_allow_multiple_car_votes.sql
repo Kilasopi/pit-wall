@@ -1,0 +1,2 @@
+ALTER TABLE race_event_car_votes DROP CONSTRAINT race_event_car_votes_team_id_signup_id_key;
+ALTER TABLE race_event_car_votes ADD CONSTRAINT race_event_car_votes_team_id_signup_id_car_name_key UNIQUE (team_id, signup_id, car_name);

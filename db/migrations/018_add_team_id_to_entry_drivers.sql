@@ -1,0 +1,1 @@
+ALTER TABLE entry_drivers ADD COLUMN team_id INTEGER REFERENCES race_event_teams(id) ON DELETE CASCADE;

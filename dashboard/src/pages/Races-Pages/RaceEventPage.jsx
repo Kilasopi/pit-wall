@@ -2,7 +2,7 @@ import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { NavBar } from '@/components/NavBar';
 import { RaceEventNav } from '@/components/RaceEventNav';
 import RacePlanner from './RacePlanner.jsx';
-import StintPlannerPage from './StintPlannerPage.jsx';
+import TeamStintPlannerPage from './TeamStintPlannerPage.jsx';
 
 function RaceEventPage() {
   const { raceEventId } = useParams();
@@ -18,7 +18,7 @@ function RaceEventPage() {
       <Routes>
         <Route index element={<Navigate to="racePlanner" replace />} />
         <Route path="racePlanner" element={<RacePlanner />} />
-        <Route path="stintPlanner" element={<StintPlannerPage />} />
+        <Route path="teams/:teamId/stintPlanner" element={<TeamStintPlannerPage />} />
       </Routes>
     </div>
   );

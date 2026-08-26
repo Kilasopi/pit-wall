@@ -15,19 +15,6 @@ import { carTypeImage } from '@/lib/carTypes';
 
 export const DEFAULT_STINT_MINUTES = 60;
 
-export function uniqueDrivers(drivers) {
-  const seen = new Set();
-  const result = [];
-  for (const d of drivers) {
-    const key = d.is_guest ? `guest:${d.guest_name}` : `roster:${d.driver_id}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(d);
-    }
-  }
-  return result;
-}
-
 function patchEntryDriver(id, body) {
   return fetch(`${RELAY_HTTP_URL}/api/entry-drivers/${id}`, {
     method: 'PATCH',
@@ -100,8 +87,8 @@ function formatDuration(minutes) {
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(' ');
 }
 
-export function StintGroup({ group }) {
-  const raceStartAt = group.drivers[0]?.race_start_at ?? null;
+export function StintGroup({ group, onChange, saveRaceSettings }) {
+  const raceStartAt = group.raceSettings?.race_start_at ?? null;
   const [localStart, setLocalStart] = useState(
     raceStartAt ? toDatetimeLocalValue(new Date(raceStartAt)) : ''
   );
@@ -115,28 +102,65 @@ export function StintGroup({ group }) {
     debounceTimers.current[key] = setTimeout(fn, delay);
   }
 
-  const raceLengthMinutesAt = group.drivers[0]?.race_length_minutes ?? null;
-  const [raceHours, setRaceHours] = useState(
-    raceLengthMinutesAt ? String(raceLengthMinutesAt / 60) : ''
+  const raceLengthMinutesAt = group.raceSettings?.race_length_minutes ?? null;
+  const [lengthHoursInput, setLengthHoursInput] = useState(
+    raceLengthMinutesAt != null ? String(Math.floor(raceLengthMinutesAt / 60)) : ''
+  );
+  const [lengthMinutesInput, setLengthMinutesInput] = useState(
+    raceLengthMinutesAt != null ? String(raceLengthMinutesAt % 60) : ''
+  );
+
+  const [practiceMinutesInput, setPracticeMinutesInput] = useState(
+    group.raceSettings?.practice_minutes != null ? String(group.raceSettings.practice_minutes) : ''
+  );
+  const [qualiMinutesInput, setQualiMinutesInput] = useState(
+    group.raceSettings?.quali_minutes != null ? String(group.raceSettings.quali_minutes) : ''
   );
 
   function saveRaceStart(value) {
     setLocalStart(value);
     if (!value) return;
     const iso = new Date(value).toISOString();
-    Promise.all(group.drivers.map((d) => patchEntryDriver(d.id, { raceStartAt: iso })));
+    saveRaceSettings({ raceStartAt: iso }).then(() => onChange?.());
   }
 
-  function saveRaceLength(value) {
-    setRaceHours(value);
-    const minutes = Number(value) * 60;
-    if (!minutes) return;
-    debounced('raceLength', () => {
-      Promise.all(group.drivers.map((d) => patchEntryDriver(d.id, { raceLengthMinutes: minutes })));
+function saveRaceLengthParts(hoursValue, minutesValue) {
+  const totalMinutes = (Number(hoursValue) || 0) * 60 + (Number(minutesValue) || 0);
+  if (!totalMinutes) return;
+  debounced('raceLength', () => {
+    saveRaceSettings({ raceLengthMinutes: totalMinutes }).then(() => onChange?.());
+  });
+}
+
+function saveRaceLengthHours(value) {
+  setLengthHoursInput(value);
+  saveRaceLengthParts(value, lengthMinutesInput);
+}
+
+function saveRaceLengthMinutes(value) {
+  setLengthMinutesInput(value);
+  saveRaceLengthParts(lengthHoursInput, value);
+}
+
+  function savePracticeMinutes(value) {
+    setPracticeMinutesInput(value);
+    const minutes = Number(value);
+    if (!value) return;
+    debounced('practiceMinutes', () => {
+      saveRaceSettings({ practiceMinutes: minutes }).then(() => onChange?.());
     });
   }
 
-  const raceLengthMinutes = Number(raceHours) * 60 || null;
+  function saveQualiMinutes(value) {
+    setQualiMinutesInput(value);
+    const minutes = Number(value);
+    if (!value) return;
+    debounced('qualiMinutes', () => {
+      saveRaceSettings({ qualiMinutes: minutes }).then(() => onChange?.());
+    });
+  }
+
+  const raceLengthMinutes = (Number(lengthHoursInput) || 0) * 60 + (Number(lengthMinutesInput) || 0) || null;
 
   // The most common existing stint length in this entry, used as the
   // default for newly added stints instead of a hardcoded fallback.
@@ -170,7 +194,7 @@ export function StintGroup({ group }) {
         const maxAllowed = raceLengthMinutes - (totalScheduledMinutes - current);
         minutes = Math.max(5, Math.min(minutes, maxAllowed));
       }
-      patchEntryDriver(driverId, { stintMinutes: minutes });
+      patchEntryDriver(driverId, { stintMinutes: minutes }).then(() => onChange?.());
       setLocalMinutes((prev) => {
         const next = { ...prev };
         delete next[driverId];
@@ -187,7 +211,7 @@ export function StintGroup({ group }) {
       minutes = Math.max(5, Math.min(minutes, Math.floor(raceLengthMinutes / group.drivers.length)));
     }
     debounced('bulkStintLength', () => {
-      Promise.all(group.drivers.map((d) => patchEntryDriver(d.id, { stintMinutes: minutes })));
+      Promise.all(group.drivers.map((d) => patchEntryDriver(d.id, { stintMinutes: minutes }))).then(() => onChange?.());
     });
   }
 
@@ -196,7 +220,7 @@ export function StintGroup({ group }) {
     const reordered = [...group.drivers];
     const [moved] = reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
-    Promise.all(reordered.map((d, i) => patchEntryDriver(d.id, { stintOrder: i })));
+    Promise.all(reordered.map((d, i) => patchEntryDriver(d.id, { stintOrder: i }))).then(() => onChange?.());
   }
 
   // Always appends to the true end and renormalizes every row's stint_order
@@ -212,6 +236,7 @@ export function StintGroup({ group }) {
       guestName: driver.is_guest ? driver.guest_name : null,
       eventName: group.eventName,
       entryName: group.entryName,
+      teamId: group.teamId,
       carNumber: null,
       carType: group.carType,
       stintMinutes: raceLengthMinutes
@@ -220,6 +245,7 @@ export function StintGroup({ group }) {
     });
     const fullOrder = [...group.drivers, created];
     await Promise.all(fullOrder.map((d, i) => patchEntryDriver(d.id, { stintOrder: i })));
+    onChange?.();
   }
 
   // Inserts a new stint for `driver` directly after `afterIndex`, instead of
@@ -235,6 +261,7 @@ export function StintGroup({ group }) {
       guestName: driver.is_guest ? driver.guest_name : null,
       eventName: group.eventName,
       entryName: group.entryName,
+      teamId: group.teamId,
       carNumber: null,
       carType: group.carType,
       stintMinutes: raceLengthMinutes
@@ -244,14 +271,19 @@ export function StintGroup({ group }) {
     const newOrder = [...group.drivers];
     newOrder.splice(afterIndex + 1, 0, created);
     await Promise.all(newOrder.map((d, i) => patchEntryDriver(d.id, { stintOrder: i })));
+    onChange?.();
   }
 
   const raceStart = raceStartAt ? new Date(raceStartAt) : null;
-  const raceEnd = raceStart && raceLengthMinutes
-    ? new Date(raceStart.getTime() + raceLengthMinutes * 60000)
+  const preRaceMinutes = (Number(practiceMinutesInput) || 0) + (Number(qualiMinutesInput) || 0);
+  const scheduleStart = raceStart
+    ? new Date(raceStart.getTime() + preRaceMinutes * 60000)
+    : null;
+  const raceEnd = scheduleStart && raceLengthMinutes
+    ? new Date(scheduleStart.getTime() + raceLengthMinutes * 60000)
     : null;
 
-  let cursor = raceStart;
+  let cursor = scheduleStart;
   const stints = group.drivers.map((driver) => {
     const minutes = driver.stint_minutes ?? DEFAULT_STINT_MINUTES;
     const start = cursor;
@@ -272,7 +304,6 @@ export function StintGroup({ group }) {
     <Card>
       <CardHeader>
         <CardTitle>{group.entryName}</CardTitle>
-        <CardDescription>{group.eventName}</CardDescription>
         {carTypeImage(group.carType) && (
           <CardAction>
             <img
@@ -298,17 +329,32 @@ export function StintGroup({ group }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`length-${group.entryName}`}>Race length (hours)</Label>
-            <Input
-              id={`length-${group.entryName}`}
-              type="number"
-              min={1}
-              step={0.5}
-              value={raceHours}
-              onChange={(e) => saveRaceLength(e.target.value)}
-              placeholder="e.g. 24"
-              className="w-24"
-            />
+            <Label htmlFor={`length-hours-${group.entryName}`}>Race length</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                id={`length-hours-${group.entryName}`}
+                type="number"
+                min={0}
+                step={1}
+                value={lengthHoursInput}
+                onChange={(e) => saveRaceLengthHours(e.target.value)}
+                placeholder="hr"
+                className="w-16"
+              />
+              <span className="text-sm text-muted-foreground">h</span>
+              <Input
+                id={`length-minutes-${group.entryName}`}
+                type="number"
+                min={0}
+                max={59}
+                step={5}
+                value={lengthMinutesInput}
+                onChange={(e) => saveRaceLengthMinutes(e.target.value)}
+                placeholder="min"
+                className="w-16"
+              />
+              <span className="text-sm text-muted-foreground">m</span>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -324,6 +370,54 @@ export function StintGroup({ group }) {
               className="w-32"
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`practice-${group.entryName}`}>Practice length (min)</Label>
+            <Input
+              id={`practice-${group.entryName}`}
+              type="number"
+              min={0}
+              step={5}
+              value={practiceMinutesInput}
+              onChange={(e) => savePracticeMinutes(e.target.value)}
+              placeholder="e.g. 30"
+              className="w-24"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`quali-${group.entryName}`}>Quali length (min)</Label>
+            <Input
+              id={`quali-${group.entryName}`}
+              type="number"
+              min={0}
+              step={5}
+              value={qualiMinutesInput}
+              onChange={(e) => saveQualiMinutes(e.target.value)}
+              placeholder="e.g. 15"
+              className="w-24"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`quali-driver-${group.entryName}`}>Quali Driver</Label>
+            <select
+              id={`quali-driver-${group.entryName}`}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              value={group.raceSettings?.quali_signup_id ?? ''}
+              onChange={(e) => {
+                saveRaceSettings({ qualiSignupId: Number(e.target.value) }).then(() => onChange?.());
+              }}
+            >
+              <option value="" disabled>Pick a driver…</option>
+              {group.roster.map((driver) => (
+                <option key={driver.signup_id} value={driver.signup_id}>{driver.driver_name}</option>
+              ))}
+            </select>
+            {group.raceSettings?.quali_driver_name && (
+              <p className="text-xs text-muted-foreground">
+                Fastest laps not available yet — Garage61 integration (#9) not built.
+              </p>
+            )}
+          </div>
         </div>
 
         {raceEnd && (
@@ -337,15 +431,17 @@ export function StintGroup({ group }) {
         {raceLengthMinutes && totalScheduledMinutes > raceLengthMinutes && (
           <p className="text-sm text-destructive">
             Scheduled stints total {formatDuration(totalScheduledMinutes)}, which is{' '}
-            {formatDuration(totalScheduledMinutes - raceLengthMinutes)} over the {raceHours}h race
+            {formatDuration(totalScheduledMinutes - raceLengthMinutes)} over the {formatDuration(raceLengthMinutes)} race
             length — shorten a stint above.
           </p>
         )}
 
+        
+
         <div className="flex flex-col gap-2">
           <Label>Drivers</Label>
           <div className="flex flex-wrap gap-2">
-            {uniqueDrivers(group.drivers).map((driver) => (
+            {group.roster.map((driver) => (
               <div
                 key={driver.is_guest ? `guest:${driver.guest_name}` : `roster:${driver.driver_id}`}
                 className="flex items-center gap-2 rounded-lg border border-input p-2 pl-3"
@@ -445,7 +541,7 @@ export function StintGroup({ group }) {
                     >
                       + Stint
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => deleteEntryDriver(driver.id)}>
+                    <Button variant="ghost" size="sm" onClick={() => deleteEntryDriver(driver.id).then(() => onChange?.())}>
                       Remove
                     </Button>
                   </div>

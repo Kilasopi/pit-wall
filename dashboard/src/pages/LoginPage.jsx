@@ -70,14 +70,14 @@ function LoginPage() {
 
                 {/* Diagonal livery stripes */}
                 <div
-                    className="absolute -left-24 top-[22%] h-3 w-[135%] -rotate-[12deg] opacity-80"
+                    className="absolute -left-24 top-[22%] h-3 w-[135%] -rotate-12 opacity-80"
                     style={{
                         background:
                             'linear-gradient(90deg, transparent 0%, transparent 10%, var(--murder-pink) 35%, var(--murder-fuchsia) 55%, transparent 85%, transparent 100%)',
                     }}
                 />
                 <div
-                    className="absolute -left-20 top-[26%] h-1.5 w-[125%] -rotate-[12deg] opacity-75"
+                    className="absolute -left-20 top-[26%] h-1.5 w-[125%] -rotate-12 opacity-75"
                     style={{
                         background:
                             'linear-gradient(90deg, transparent 0%, transparent 15%, var(--murder-cyan) 42%, transparent 82%)',
@@ -121,7 +121,7 @@ function LoginPage() {
                         <h1 className="max-w-xl font-heading text-5xl font-black uppercase leading-[0.92] tracking-tight lg:text-6xl">
                             Welcome to
                             <br />
-                            <span className="bg-gradient-to-r from-murder-cyan-light via-murder-fuchsia to-murder-pink bg-clip-text text-transparent">
+                            <span className="bg-linear-to-r from-murder-cyan-light via-murder-fuchsia to-murder-pink bg-clip-text text-transparent">
                                 the Pit Wall
                             </span>
                         </h1>

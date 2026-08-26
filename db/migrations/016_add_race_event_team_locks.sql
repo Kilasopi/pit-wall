@@ -1,0 +1,1 @@
+ALTER TABLE race_event_teams ADD COLUMN locked_car_name TEXT;

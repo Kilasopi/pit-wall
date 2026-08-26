@@ -3,8 +3,7 @@ import { CircleQuestionMark } from 'lucide-react';
 import { NavBar } from '@/components/NavBar';
 import { useRaceEvents } from '@/hooks/useRaceEvents';
 import { useSpecialEvents } from '@/hooks/useSpecialEvents';
-import { useTimezone, formatInTimezone, COMMON_TIMEZONES, getUtcOffsetLabel } from '@/hooks/useTimeZone';
-import { EventSignups } from '@/components/EventSignups';
+import { useTimezone, formatInTimezone, COMMON_TIMEZONES, getUtcOffsetLabel, ordinalSuffix } from '@/hooks/useTimeZone';import { EventSignups } from '@/components/EventSignups';
 
 import {
   Card,
@@ -40,13 +39,6 @@ function seriesEarliestTimeslot(s) {
     return Math.min(...upcoming.map(earliestTimeslot));
 }
 
-function ordinalSuffix(day) {
-    if (day % 10 === 1 && day % 100 !== 11) return 'st';
-    if (day % 10 === 2 && day % 100 !== 12) return 'nd';
-    if (day % 10 === 3 && day % 100 !== 13) return 'rd';
-    return 'th';
-}
-
 function startOfWeek(date) {
     const d = new Date(date);
     const day = d.getDay();
@@ -79,7 +71,7 @@ function Schedule() {
     const series = useRaceEvents();
     const specialEvents = useSpecialEvents();
 
-    const [timezone, setTimezone] = useTimezone();
+    const [timezone, setTimezone] = useTimezone('schedule');
     const [showLegend, setShowLegend] = useState(false);
     const [onlyHighlighted, setOnlyHighlighted] = useState(false);
 

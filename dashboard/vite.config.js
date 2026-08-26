@@ -99,6 +99,10 @@ export default defineConfig({
     // the relay/agent containers — those need to be reached by service name.
     proxy: {
       '/api': process.env.RELAY_PROXY_TARGET || 'http://localhost:4000',
+      '/ws-relay': {
+        target: process.env.RELAY_PROXY_TARGET || 'http://localhost:4000',
+        ws: true,
+      },
       '/ws-agent': {
         target: process.env.AGENT_PROXY_TARGET || 'ws://localhost:4101',
         ws: true,

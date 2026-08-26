@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'pitwall.timezone';
+const STORAGE_KEY_PREFIX = 'pitwall.timezone';
 
 export const COMMON_TIMEZONES = [
     'Pacific/Auckland',
@@ -85,14 +85,15 @@ function getDefaultTimezone() {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export function useTimezone() {
+export function useTimezone(page, defaultTimezone = getDefaultTimezone()) {
+    const storageKey = page ? `${STORAGE_KEY_PREFIX}.${page}` : STORAGE_KEY_PREFIX;
     const [timezone, setTimezone] = useState(
-        () => localStorage.getItem(STORAGE_KEY) || getDefaultTimezone()
+        () => localStorage.getItem(storageKey) || defaultTimezone
     );
 
     useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, timezone);
-    }, [timezone]);
+        localStorage.setItem(storageKey, timezone);
+    }, [storageKey, timezone]);
 
     return [timezone, setTimezone];
 }
@@ -102,4 +103,11 @@ export function formatInTimezone(date, timezone, options = {}) {
         timeZone: timezone,
         ...options,
     }).format(new Date(date));
+}
+
+export function ordinalSuffix(day) {
+    if (day % 10 === 1 && day % 100 !== 11) return 'st';
+    if (day % 10 === 2 && day % 100 !== 12) return 'nd';
+    if (day % 10 === 3 && day % 100 !== 13) return 'rd';
+    return 'th';
 }

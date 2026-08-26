@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useRaceEventTeams } from "@/hooks/useRaceEventTeams";
 import { useDrivers } from '@/hooks/useDrivers';
 import { RELAY_HTTP_URL } from '@/lib/relay';
 import { useAuth } from '@/hooks/useAuth';
 import { X } from 'lucide-react';
 import { useRaceEventCarClasses } from '@/hooks/useRaceEventCarClasses';
-import { useTimezone, formatInTimezone, getUtcOffsetLabel } from '@/hooks/useTimeZone';
+import { useTimezone, formatInTimezone, getUtcOffsetLabel, getTimeZoneAbbreviation, ordinalSuffix } from '@/hooks/useTimeZone';
 import { useRaceEventSignups } from '@/hooks/useRaceEventSignups';
 
 
@@ -84,6 +84,15 @@ function TimeslotVoteSelect({ options, onSubmit }) {
     );
 }
 
+function offsetMinutes(tz) {
+    const match = getUtcOffsetLabel(tz).match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!match) return 0;
+    const sign = match[1] === '-' ? -1 : 1;
+    const hours = Number(match[2]);
+    const mins = match[3] ? Number(match[3]) : 0;
+    return sign * (hours * 60 + mins);
+}
+
 function timeslotLabel(startAt, driverTimezone, viewerTimezone) {
     const sameTz = driverTimezone && viewerTimezone && driverTimezone === viewerTimezone;
     const parts = [];
@@ -108,7 +117,7 @@ function RacePlanner() {
     const carClasses = useRaceEventCarClasses(raceEventId);
     const { signups } = useRaceEventSignups(raceEventId);
 
-    const [viewerTimezone] = useTimezone();
+    const [viewerTimezone] = useTimezone('racePlanner', 'UTC');
 
     function leaveTeam(signupId) {
         fetch(`${RELAY_HTTP_URL}/api/team-members/${signupId}`, { method: 'DELETE' }).then(refetch);
@@ -156,11 +165,62 @@ function RacePlanner() {
         }).then(refetch);
     }
 
-    function clearCarVote(teamId, signupId) {
-        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/car-votes/${signupId}`, {
+    function clearCarVote(teamId, signupId, carName) {
+        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/car-votes/${signupId}/${encodeURIComponent(carName)}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
         }).then(refetch);
+    }
+
+    function lockCar(teamId, carName) {
+        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/lock-car`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ carName }),
+        }).then(refetch);
+    }
+
+    function lockTimeslot(teamId, timeslotId) {
+        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/lock-timeslot`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ timeslotId }),
+        }).then(refetch);
+    }
+
+    function unlockCar(teamId) {
+        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/lock-car`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(refetch);
+    }
+
+    function unlockTimeslot(teamId) {
+        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/lock-timeslot`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(refetch);
+    }
+
+    function tallyCarVotes(team) {
+        const counts = new Map();
+        for (const v of team.carVotes ?? []) {
+            counts.set(v.car_name, (counts.get(v.car_name) ?? 0) + 1);
+        }
+        return [...counts.entries()].map(([carName, count]) => ({ carName, count }));
+    }
+
+    function tallyTimeslotVotes(team, timeslots) {
+        return timeslots.map((ts) => ({
+            timeslotId: ts.id,
+            count: (team.votes[ts.id] ?? []).length,
+        }));
     }
 
     function groupUnassignedByDriver(rows) {
@@ -232,13 +292,38 @@ function RacePlanner() {
 
                             <div>
                                 <p className="mb-1 font-medium text-base">Timeslots</p>
-                                {timeslots.map((ts, i) => (
-                                    <div key={ts.id}>
-                                        Slot {i + 1}: {formatInTimezone(ts.start_at, viewerTimezone, { dateStyle: 'full', timeStyle: 'short' })} {getUtcOffsetLabel(viewerTimezone)}
-                                        {' | '}
-                                        {formatInTimezone(ts.start_at, 'UTC', { dateStyle: 'full', timeStyle: 'short' })} UTC
-                                    </div>
-                                ))}
+                                <div className="flex flex-col gap-2">
+                                    {timeslots.map((ts, i) => {
+                                        const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                                        const zones = [...new Set([
+                                            viewerTimezone,
+                                            localTz,
+                                            ...signups.map((s) => s.driver_timezone ?? s.guest_timezone).filter(Boolean),
+                                        ])].sort((a, b) => offsetMinutes(a) - offsetMinutes(b));
+                                        const format = (tz) => {
+                                            const weekday = formatInTimezone(ts.start_at, tz, { weekday: 'short' });
+                                            const day = Number(formatInTimezone(ts.start_at, tz, { day: 'numeric' }));
+                                            const time = formatInTimezone(ts.start_at, tz, { hour: 'numeric', minute: '2-digit' });
+                                        return `${weekday} ${day}${ordinalSuffix(day)}, ${time} ${getTimeZoneAbbreviation(tz)} (${getUtcOffsetLabel(tz)})`;
+                                        };
+                                        return (
+                                            <div key={ts.id} className="rounded-lg border border-input p-2">
+                                                <p className="mb-1 text-sm font-medium">Slot {i + 1}</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {zones.map((tz) => (
+                                                        <Badge
+                                                            key={tz}
+                                                            variant="secondary"
+                                                            className={`text-xs font-normal ${tz === 'UTC' ? 'border-murder-fuchsia text-murder-fuchsia' : ''}`}
+                                                        >
+                                                            {format(tz)}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -310,17 +395,104 @@ function RacePlanner() {
                                         <div key={t.id} className="py-6 first:pt-0 last:pb-0">
                                             <div className="mb-2 flex items-center gap-2">
                                                 <p className="font-medium text-lg">{t.name} — {t.car_class}</p>
+                                                <Link to={`/races/${raceEventId}/teams/${t.id}/stintPlanner`}>
+                                                    <Button variant="outline" size="sm">Stint Planner</Button>
+                                                </Link>
                                                 <Button variant="dark" size="sm" onClick={() => deleteTeam(t.id)} className='border-murder-pink-dark'>
                                                     Delete Team
                                                 </Button>
                                             </div>
+
+                                            <div className="mb-3 flex flex-col gap-2">
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                    <span className="text-xs text-muted-foreground">Car:</span>
+                                                    {t.locked_car_name ? (
+                                                        <Badge variant="secondary" className="gap-1">
+                                                            Confirmed — {t.locked_car_name}
+                                                            <Button variant="ghost" size="icon-sm" onClick={() => unlockCar(t.id)}>
+                                                                <X className="size-3.5" />
+                                                            </Button>
+                                                        </Badge>
+                                                    ) : tallyCarVotes(t).length === 0 ? (
+                                                        <span className="text-xs text-muted-foreground">No votes yet</span>
+                                                    ) : (
+                                                        tallyCarVotes(t).map(({ carName, count }) => (
+                                                            <Button
+                                                                key={carName}
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => lockCar(t.id, carName)}
+                                                            >
+                                                                Confirm {carName} ({count}/{t.members.length})
+                                                            </Button>
+                                                        ))
+                                                    )}
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                    <span className="text-xs text-muted-foreground">Timeslot:</span>
+                                                    {t.locked_timeslot_id ? (
+                                                        <Badge variant="secondary">
+                                                            Confirmed — Slot {timeslots.findIndex((x) => x.id === t.locked_timeslot_id) + 1}
+                                                            <Button variant="ghost" size="icon-sm" onClick={() => unlockTimeslot(t.id)}>
+                                                                <X className="size-3.5" />
+                                                            </Button>
+                                                        </Badge>
+                                                    ) : tallyTimeslotVotes(t, timeslots).every(({ count }) => count === 0) ? (
+                                                        <span className="text-xs text-muted-foreground">No votes yet</span>
+                                                    ) : (
+                                                        tallyTimeslotVotes(t, timeslots)
+                                                            .filter(({ count }) => count > 0)
+                                                            .map(({ timeslotId, count }) => (
+                                                                <Button
+                                                                    key={timeslotId}
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => lockTimeslot(t.id, timeslotId)}
+                                                                >
+                                                                    Confirm Slot {timeslots.findIndex((x) => x.id === timeslotId) + 1} ({count}/{t.members.length})
+                                                                </Button>
+                                                            ))
+                                                    )}
+                                                </div>
+                                                {t.locked_timeslot_id && (() => {
+                                                    const lockedTs = timeslots.find((x) => x.id === t.locked_timeslot_id);
+                                                    if (!lockedTs) return null;
+                                                    const memberZones = [...new Set(t.members.map((m) => m.timezone).filter(Boolean))];
+                                                    if (memberZones.length === 0) return null;
+                                                    const format = (tz) => {
+                                                        const weekday = formatInTimezone(lockedTs.start_at, tz, { weekday: 'short' });
+                                                        const day = Number(formatInTimezone(lockedTs.start_at, tz, { day: 'numeric' }));
+                                                        const time = formatInTimezone(lockedTs.start_at, tz, { hour: 'numeric', minute: '2-digit' });
+                                                        return `${weekday} ${day}${ordinalSuffix(day)}, ${time} ${getTimeZoneAbbreviation(tz)} (${getUtcOffsetLabel(tz)})`;
+                                                    };
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {memberZones.map((tz) => (
+                                                                <Badge key={tz} variant="secondary" className="text-xs font-normal">
+                                                                    {format(tz)}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
                                             <div className="flex flex-col divide-y divide-murder-cyan/20">
                                                 {t.members.map((m) => {
-                                                    const vote = t.carVotes?.find((v) => v.signup_id === m.signup_id);
+                                                    const memberCarVotes = t.carVotes?.filter((v) => v.signup_id === m.signup_id) ?? [];
                                                     return (
                                                         <div key={m.signup_id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
                                                             <div className="flex items-center justify-between">
-                                                                <p className="font-medium text-base">{m.name}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-medium text-base">{m.name}</p>
+                                                                    {m.timezone && (
+                                                                        <Badge variant="secondary" className="text-xs">
+                                                                            {getTimeZoneAbbreviation(m.timezone)} ({getUtcOffsetLabel(m.timezone)})
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+
                                                                 <Button variant="dark" size="sm" onClick={() => leaveTeam(m.signup_id)} className="border-murder-violet">
                                                                     Leave Team
                                                                 </Button>
@@ -331,21 +503,23 @@ function RacePlanner() {
                                                                 <div className="flex flex-wrap items-center gap-1">
                                                                     <CarVoteSelect
                                                                         carClass={t.car_class}
-                                                                        carOptions={carClasses}
+                                                                        carOptions={carClasses.filter(
+                                                                            (name) => !memberCarVotes.some((v) => v.car_name === name)
+                                                                        )}
                                                                         onSubmit={(carName) => castCarVote(t.id, m.signup_id, carName)}
                                                                     />
-                                                                    {vote && (
-                                                                        <Badge variant="secondary" className="gap-1">
-                                                                            {vote.car_name}
+                                                                    {memberCarVotes.map((v) => (
+                                                                        <Badge key={v.car_name} variant="secondary" className="gap-1">
+                                                                            {v.car_name}
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="icon-sm"
-                                                                                onClick={() => clearCarVote(t.id, m.signup_id)}
+                                                                                onClick={() => clearCarVote(t.id, m.signup_id, v.car_name)}
                                                                             >
                                                                                 <X className="size-3.5" />
                                                                             </Button>
                                                                         </Badge>
-                                                                    )}
+                                                                    ))}
                                                                 </div>
                                                             </div>
 

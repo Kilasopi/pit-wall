@@ -212,3 +212,82 @@ timeslot-scraping session — special events have varied/non-fixed car
 classes (unlike the regular season's fixed GTP/LMP2/GT3/GT4), so a rigid
 enum would break on real data. Revisit only if special-event classes turn
 out to actually be a fixed, known set worth validating against.
+
+#### Team car/timeslot confirm has no vote-count gate — 2026-08-26
+Locking a team's car (`locked_car_name`) or timeslot (`locked_timeslot_id`)
+never checks vote counts server-side — any team member can click "Confirm"
+on any tallied option and it just writes, even with a lone vote. Started as
+a strict unanimous-vote requirement, then deliberately relaxed: insisting on
+unanimity/full turnout before a team could lock in a plan would block
+confirmation indefinitely if one driver forgot to vote. Votes
+(`race_event_car_votes`, `race_event_timeslot_votes`) are purely an
+"interest" signal now, not a gate. Car voting is also multi-select per
+driver (migration 017) instead of one car per driver, for the same
+"just show interest" reasoning.
+
+#### Confirmed car/timeslot must stay unlockable — 2026-08-26
+Every lock action (`lock-car`, `lock-timeslot`) has a matching unlock
+endpoint that clears it back to `NULL`. Learned from a real 6hr race with
+Quinton where the team had to change both car and timeslot mid-event after
+getting knocked out early — a one-way "confirm" would have blocked that.
+Any future feature that finalizes a race-planning decision should ship with
+an undo path from the start, not as an afterthought.
+
+#### Stint planner: roster and race settings decoupled from stints — 2026-08-26
+`entry_drivers` used to be the only source of both "who's on this team" and
+"what stints exist," which meant a team's roster only ever showed drivers
+who already had a stint (issue #31's actual bug) and race start/length had
+nowhere to live before the first stint existed. Fixed by moving race-level
+settings (`race_start_at`, `race_length_minutes`, `practice_minutes`,
+`quali_minutes`, `quali_signup_id`) onto `race_event_teams` (migrations
+019-020) and sourcing the roster from `race_event_team_members` directly via
+a new `GET /api/teams/:teamId/roster` endpoint, independent of whatever
+stints exist. `entry_drivers` (migration 018 adds `team_id`) is now purely
+the schedule and can legitimately be empty. Locking a timeslot auto-fills
+`race_start_at`/`race_length_minutes` from the timeslot/race event, so
+nobody re-enters that manually.
+
+#### Quali driver is a stub pending Garage61 (#9) — 2026-08-26
+`race_event_teams.quali_signup_id` (migration 020) and a plain dropdown in
+the team stint planner let a team pick who's qualifying, but there's no
+lap-time data behind it — issue #9's Garage61 integration doesn't exist yet.
+Swap the plain picker for one informed by real fastest-lap data once that's
+built; the column/UI already exist so that's additive, not a rework.
+
+#### Driver blackout feature designed, deferred — 2026-08-26
+Full design (a new `race_event_blackouts` table, endpoints, a UI section,
+and a check that warns when confirming a timeslot inside a member's blocked
+range) worked out but not built — tracked as issue #47, a sub-issue of #20.
+Deferred to prioritize testing the rest of the planner before the upcoming
+race.
+
+#### Empty teams auto-clean on signup removal, scoped to car class — 2026-08-25
+Deleting a `race_event_signups` row now sweeps that event's `race_event_teams`
+for any team left with zero members and deletes it — but only within the
+removed signup's own `car_class`, so pulling a GTP driver's signup can't
+delete an already-empty LMP2/GT3 team from unrelated classes. Went through a
+few wrong scopes first: tried triggering the sweep on the team "Leave"
+action (wrong — that's not what "signup removed" means), then swept the
+whole event regardless of class (too broad — one signup removal wiped every
+empty team in the event at once, not just its own class).
+
+#### `race_event_teams.race_event_id` was missing `ON DELETE CASCADE` — 2026-08-25
+Unlike `race_event_signups`/`race_event_team_members`, the FK from
+`race_event_teams` to `race_events` had no cascade (migration 015 fixes it).
+This silently broke the hourly special-events refresh entirely: once any
+special event with a team already assigned to it dropped off iRacing's
+listing (i.e. it already ran), the cleanup delete threw a foreign-key
+violation that aborted `refreshSpecialEvents()` for *every* event, not just
+the stuck one — so the whole special-events calendar quietly stopped
+updating until this was found and fixed.
+
+#### Relay's raw WebSocket needed its own path — 2026-08-26
+`useRelaySocket.js` was hardcoded to `ws://localhost:4000`, which only works
+on the Work PC itself — broken for anyone viewing through the Cloudflare
+tunnel. Fixed by giving the relay's `WebSocketServer` an explicit
+`/ws-relay` path, adding a matching Vite proxy rule (mirroring the existing
+`/ws-agent` one), and building the client URL from `window.location` instead
+of a hardcoded host. Also worth remembering: the `dashboard` Docker service
+doesn't live-sync source the way `relay` does (`develop.watch` only covers
+relay) — frontend changes need an explicit container rebuild to take effect,
+unlike backend changes which apply immediately.
