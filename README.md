@@ -291,3 +291,24 @@ of a hardcoded host. Also worth remembering: the `dashboard` Docker service
 doesn't live-sync source the way `relay` does (`develop.watch` only covers
 relay) — frontend changes need an explicit container rebuild to take effect,
 unlike backend changes which apply immediately.
+
+#### Garage61 (#9): OAuth2 confirmed, app submitted for approval — 2026-08-26
+The earlier "not 100% confirmed" caveat on Garage61's consent-flow mechanics
+(see the 2026-08-14 note above) is resolved — checked `garage61.net/developer`
+directly: it's a standard OAuth2 Authorization Code Grant (PKCE recommended),
+distinct from the login use case already ruled out. `GET /api/v1/laps`
+(`findLaps`) returns per-lap `lapTime`, `fuelUsed`, `fuelLevel`, and
+`sectors[]` under a single `driving_data` scope — covers both lap-time and
+fuel-stint data in one endpoint, feeding both issue #9 and the quali-driver
+picker stub from migration 020.
+
+Registered a Garage61 developer app ("Pitwall", owned by the M.U.R.D.E.R
+Racing team) requesting only the `driving_data` permission with **OAuth2
+access token** auth (not personal access token — each driver needs to
+individually connect and grant access to their own data, not just the app
+owner's). Deliberately left out `analyses` and `team_member_management`
+scopes; nothing planned needs them yet, and minimizing scope keeps each
+driver's consent screen simpler. Submitted for Garage61's approval; actual
+implementation (migration for `murder_drivers` token columns, `relay/garage61.js`
+OAuth client via `simple-oauth2`, `/api/garage61/*` routes) is designed but
+blocked until Garage61 issues a client ID/secret.

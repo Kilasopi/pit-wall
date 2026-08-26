@@ -1052,3 +1052,61 @@ app.get('/api/registered-races', async (req,res) => {
 
     res.json(rows);
 });
+
+// =========
+// GARAGE 61
+// =========
+
+const { getAuthorizationUrl, exchangeCode, ensureFreshToken } = require('./garage61.js');
+
+app.get('/api/garage61/connect', requireAuth, async (req, res) => {
+    const { rows } = await pool.query('SELECT driver_id FROM users WHERE id = $1', [req.userId]);
+    if (!rows[0]?.driver_id) return res.status(400).json({ error: 'No claimed driver profile' });
+
+    const url = getAuthorizationUrl(String(rows[0].driver_id));
+    res.json({ url });
+});
+
+app.get('/api/garage61/callback', async (req, res) => {
+    try {
+        const { code, state } = req.query;
+        const driverId = Number(state);
+        const token = await exchangeCode(code);
+
+        await pool.query(
+            `UPDATE murder_drivers
+             SET garage61_access_token = $1, garage61_refresh_token = $2, garage61_token_expires_at = $3
+             WHERE id = $4`,
+            [token.access_token, token.refresh_token, token.expires_at, driverId]
+        );
+
+        res.redirect(`${process.env.DASHBOARD_URL}/drivers?garage61=connected`);
+    } catch (err) {
+        console.error('Garage61 callback failed:', err.message);
+        res.redirect(`${process.env.DASHBOARD_URL}/drivers?garage61=error`);
+    }
+});
+
+app.get('/api/garage61/drivers/:id/stint-stats', requireAuth, async (req, res) => {
+    const { rows } = await pool.query(
+        'SELECT garage61_access_token, garage61_refresh_token, garage61_token_expires_at FROM murder_drivers WHERE id = $1',
+        [req.params.id]
+    );
+    if (!rows[0]?.garage61_access_token) return res.status(404).json({ error: 'Driver not connected to Garage61' });
+
+    const accessToken = await ensureFreshToken(pool, req.params.id, rows[0]);
+
+    const params = new URLSearchParams({ drivers: 'me', tracks: req.query.trackId, group: 'none', limit: '200' });
+    if (req.query.carId) params.set('cars', req.query.carId);
+
+    const lapsRes = await fetch(`https://garage61.net/api/v1/laps?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const { items } = await lapsRes.json();
+
+    const cleanLaps = items.filter(l => l.clean && !l.pitIn && !l.pitOut);
+    const avgFuelPerLap = cleanLaps.reduce((s, l) => s + l.fuelUsed, 0) / cleanLaps.length;
+    const bestLapTime = Math.min(...cleanLaps.map(l => l.lapTime));
+
+    res.json({ avgFuelPerLap, bestLapTime, sampleSize: cleanLaps.length });
+});
