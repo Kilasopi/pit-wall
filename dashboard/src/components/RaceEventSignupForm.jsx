@@ -56,6 +56,12 @@ function deriveCarClasses(carNames) {
     return [...classes];
 }
 
+export function classifyCarName(name) {
+    if (CAR_NAME_TO_CLASS[name]) return CAR_NAME_TO_CLASS[name];
+    const match = name.match(CLASS_TOKEN_PATTERN);
+    return match ? match[1] : name;
+}
+
 export function RaceEventSignupForm({ raceEventId, carClasses, onAdded, onCancel }) {
     const { data: rosterDrivers } = useDrivers('murder-drivers');
     const availableCarClasses = deriveCarClasses(carClasses);

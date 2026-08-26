@@ -54,9 +54,9 @@ function SignupPage() {
                     className="absolute inset-0"
                     style={{
                         background: `
-                            radial-gradient(circle at 15% 20%, rgba(236,72,153,0.22), transparent 30%),
-                            radial-gradient(circle at 85% 75%, rgba(34,211,238,0.18), transparent 32%),
-                            linear-gradient(145deg, #09070d 0%, #1a0831 42%, #0a0911 100%)
+                            radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--murder-pink) 22%, transparent), transparent 30%),
+                            radial-gradient(circle at 85% 75%, color-mix(in oklab, var(--murder-cyan) 18%, transparent), transparent 32%),
+                            linear-gradient(145deg, var(--murder-bg-start) 0%, var(--murder-bg-mid) 42%, var(--murder-bg-end) 100%)
                         `,
                     }}
                 />
@@ -78,20 +78,20 @@ function SignupPage() {
                     className="absolute -left-24 top-[22%] h-3 w-[135%] -rotate-[12deg] opacity-80"
                     style={{
                         background:
-                            'linear-gradient(90deg, transparent 0%, transparent 10%, #ec4899 35%, #d946ef 55%, transparent 85%, transparent 100%)',
+                            'linear-gradient(90deg, transparent 0%, transparent 10%, var(--murder-pink) 35%, var(--murder-fuchsia) 55%, transparent 85%, transparent 100%)',
                     }}
                 />
                 <div
                     className="absolute -left-20 top-[26%] h-1.5 w-[125%] -rotate-[12deg] opacity-75"
                     style={{
                         background:
-                            'linear-gradient(90deg, transparent 0%, transparent 15%, #22d3ee 42%, transparent 82%)',
+                            'linear-gradient(90deg, transparent 0%, transparent 15%, var(--murder-cyan) 42%, transparent 82%)',
                     }}
                 />
 
                 {/* Glows */}
-                <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
-                <div className="absolute -right-32 top-8 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-3xl" />
+                <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-murder-cyan/10 blur-3xl" />
+                <div className="absolute -right-32 top-8 h-80 w-80 rounded-full bg-murder-fuchsia/10 blur-3xl" />
 
                 <div className="relative z-10 flex w-full flex-col justify-between">
                     {/* Top logo area */}
@@ -105,7 +105,7 @@ function SignupPage() {
                         </div>
 
                         <div>
-                            <div className="text-[10px] font-semibold tracking-[0.55em] text-cyan-300">
+                            <div className="text-[10px] font-semibold tracking-[0.55em] text-murder-cyan-light">
                                 TEAM
                             </div>
                             <div className="text-xl font-black tracking-[0.15em]">
@@ -117,8 +117,8 @@ function SignupPage() {
                     {/* Main branding */}
                     <div>
                         <div className="mb-4 flex items-center gap-3">
-                            <div className="h-px w-10 bg-pink-500" />
-                            <span className="text-xs font-semibold uppercase tracking-[0.4em] text-pink-400">
+                            <div className="h-px w-10 bg-murder-pink" />
+                            <span className="text-xs font-semibold uppercase tracking-[0.4em] text-murder-pink-light">
                                 Racing
                             </span>
                         </div>
@@ -126,7 +126,7 @@ function SignupPage() {
                         <h1 className="max-w-xl font-heading text-5xl font-black uppercase leading-[0.92] tracking-tight lg:text-6xl">
                             Register to
                             <br />
-                            <span className="bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-pink-500 bg-clip-text text-transparent">
+                            <span className="bg-gradient-to-r from-murder-cyan-light via-murder-fuchsia to-murder-pink bg-clip-text text-transparent">
                                 the Pit Wall
                             </span>
                         </h1>
@@ -145,9 +145,9 @@ function SignupPage() {
                         </span>
 
                         <div className="flex gap-1.5">
-                            <div className="h-1.5 w-6 bg-cyan-400" />
-                            <div className="h-1.5 w-6 bg-fuchsia-500" />
-                            <div className="h-1.5 w-2 bg-yellow-400" />
+                            <div className="h-1.5 w-6 bg-murder-cyan" />
+                            <div className="h-1.5 w-6 bg-murder-fuchsia" />
+                            <div className="h-1.5 w-2 bg-murder-yellow" />
                         </div>
                     </div>
                 </div>

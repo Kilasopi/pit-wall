@@ -11,6 +11,7 @@ import Schedule from './pages/Schedule.jsx';
 import LoginPage from './pages/LoginPage.jsx'
 import SignupPage from './pages/SignupPage.jsx'
 import ClaimProfilePage from './pages/ClaimProfilePage.jsx'
+import { RequireAuth, RedirectIfAuthed } from './components/RequireAuth.jsx'
 import { useTheme } from './hooks/useTheme.js'
 
 
@@ -29,7 +30,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={spectateHost ? <SpectateRoot /> : <TeamSelectPage />} />
+        <Route path="/" element={spectateHost ? <SpectateRoot /> : <RequireAuth><TeamSelectPage /></RequireAuth>} />
         <Route path="/t/:teamId/*" element={<RaceView />} />
         {spectateHost ? (
           <>
@@ -44,13 +45,13 @@ function App() {
           </>
         ) : (
           <>
-            <Route path="/drivers" element={<DriversPage />} />
-            <Route path="/races" element={<RacesPage />} />
-            <Route path="/races/:raceEventId/*" element={<RaceEventPage />} />
-            <Route path="/schedule" element={<Schedule />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/claim-profile" element={<ClaimProfilePage />} />
+            <Route path="/drivers" element={<RequireAuth><DriversPage /></RequireAuth>} />
+            <Route path="/races" element={<RequireAuth><RacesPage /></RequireAuth>} />
+            <Route path="/races/:raceEventId/*" element={<RequireAuth><RaceEventPage /></RequireAuth>} />
+            <Route path="/schedule" element={<RequireAuth><Schedule /></RequireAuth>} />
+            <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
+            <Route path="/signup" element={<RedirectIfAuthed><SignupPage /></RedirectIfAuthed>} />
+            <Route path="/claim-profile" element={<RequireAuth><ClaimProfilePage /></RequireAuth>} />
           </>
         )}
         {import.meta.env.DEV && (

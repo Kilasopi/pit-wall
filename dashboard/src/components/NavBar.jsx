@@ -1,7 +1,8 @@
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import { useAgentSocket } from '@/hooks/useAgentSocket';
 import { useRelaySocket } from '@/hooks/useRelaySocket';
 import { useTeamSlugs } from '@/hooks/useTeamSlugs';
@@ -26,7 +27,9 @@ const links = [
 // does before opening its own status socket.
 export function NavBar() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { logout } = useAuth();
   const { teamId: slugParam } = useParams();
   const { slugToTeamId } = useTeamSlugs();
   const teamId = slugParam ? (slugToTeamId[slugParam] ?? slugParam) : undefined;
@@ -36,6 +39,11 @@ export function NavBar() {
   const clearSessionHistory = () => {
     if (!confirm('Clear all stint, fuel, and incident history? This cannot be undone.')) return;
     fetch(`${RELAY_HTTP_URL}/api/session-history`, { method: 'DELETE' });
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -59,6 +67,13 @@ export function NavBar() {
           className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           Clear Session History
+        </Button>
+        <Button
+          type="button"
+          onClick={handleLogout}
+          className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Log Out
         </Button>
       </div>
 

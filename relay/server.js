@@ -498,6 +498,37 @@ const SPECIAL_EVENTS_REFRESH_MS = 60 * 60 * 1000; // every hour
 refreshSpecialEvents();
 setInterval(refreshSpecialEvents, SPECIAL_EVENTS_REFRESH_MS);
 
+// Once a race has actually finished (last timeslot start + race length has
+// passed), the team/car/timeslot-voting setup for it is done being useful —
+// clear the team assignments so the planner doesn't keep showing stale
+// rosters for events that already happened. Signups themselves are left
+// alone since they're the historical "who registered" record.
+async function cleanupFinishedTeams() {
+    try {
+        const { rows } = await pool.query(`
+            SELECT re.id
+            FROM race_events re
+            JOIN race_event_timeslots ts ON ts.race_event_id = re.id
+            WHERE EXISTS (SELECT 1 FROM race_event_teams t WHERE t.race_event_id = re.id)
+            GROUP BY re.id, re.length_minutes
+            HAVING MAX(ts.start_at) + (COALESCE(re.length_minutes, 0) * INTERVAL '1 minute') < now()
+        `);
+
+        if (rows.length === 0) return;
+
+        const eventIds = rows.map((r) => r.id);
+        await pool.query(`DELETE FROM race_event_teams WHERE race_event_id = ANY($1::int[])`, [eventIds]);
+        console.log(`Cleared team assignments for ${eventIds.length} finished event(s)`);
+    } catch (err) {
+        console.error('Failed to clean up finished event teams:', err.message);
+    }
+}
+
+const TEAM_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // every hour
+
+cleanupFinishedTeams();
+setInterval(cleanupFinishedTeams, TEAM_CLEANUP_INTERVAL_MS);
+
 app.get('/api/special-events', async (req, res) => {
     const { rows: events } = await pool.query(
         `SELECT re.id, rs.name, rs.car_classes, re.track, re.length_minutes, re.distance_km,
@@ -573,17 +604,42 @@ app.patch('/api/race-event-signups/:id', async (req, res) => {
 });
 
 app.delete('/api/race-event-signups/:id', async (req, res) => {
+    // race_event_id + car_class are needed after the delete to scope the
+    // team sweep, so grab them before the row is gone.
+    const { rows: signupRows } = await pool.query(
+        'SELECT race_event_id, car_class FROM race_event_signups WHERE id = $1',
+        [req.params.id]
+    );
+    const raceEventId = signupRows[0]?.race_event_id;
+    const carClass = signupRows[0]?.car_class;
+
     await pool.query('DELETE FROM race_event_signups WHERE id = $1', [req.params.id]);
+
+    // Only teams in the same car class as the removed signup are swept —
+    // an empty GTP team shouldn't get deleted just because an unrelated
+    // LMP2 signup was removed.
+    if (raceEventId && carClass) {
+        await pool.query(
+            `DELETE FROM race_event_teams t
+             WHERE t.race_event_id = $1
+               AND t.car_class = $2
+               AND NOT EXISTS (
+                   SELECT 1 FROM race_event_team_members m WHERE m.team_id = t.id
+               )`,
+            [raceEventId, carClass]
+        );
+    }
+
     res.status(204).end();
 });
 
 app.get('/api/race-events/:id/teams', async (req, res) => {
-    const [teamRows, unassignedRows, timeslotRows, voteRows] = await Promise.all([
+    const [teamRows, unassignedRows, timeslotRows, voteRows, carVoteRows] = await Promise.all([
         pool.query(
             `SELECT
                  t.id AS team_id, t.name AS team_name, t.car_class,
-                 s.id AS signup_id, s.driver_id, s.guest_name, s.guest_iracing_id,
-                 d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id
+                 s.id AS signup_id, s.driver_id, s.guest_name, s.guest_iracing_id, s.guest_timezone,
+                 d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id, d.timezone AS driver_timezone
              FROM race_event_teams t
              LEFT JOIN race_event_team_members m ON m.team_id = t.id
              LEFT JOIN race_event_signups s ON s.id = m.signup_id
@@ -626,6 +682,13 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
              WHERE ts.race_event_id = $1`,
             [req.params.id]
         ),
+        pool.query(
+            `SELECT cv.team_id, cv.signup_id, cv.car_name
+             FROM race_event_car_votes cv
+             JOIN race_event_teams t ON t.id = cv.team_id
+             WHERE t.race_event_id = $1`,
+            [req.params.id]
+        ),
     ]);
 
     const teams = [];
@@ -643,19 +706,39 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
                 name: row.driver_name ?? row.guest_name,
                 nickname: row.driver_nickname,
                 iracing_id: row.iracing_id ?? row.guest_iracing_id,
+                timezone: row.driver_timezone ?? row.guest_timezone,
             });
         }
     }
+
     const votesByTeam = {};
     for (const v of voteRows.rows) {
         (votesByTeam[v.team_id] ??= {});
         (votesByTeam[v.team_id][v.timeslot_id] ??= []).push(v.signup_id);
     }
+
+    const carVotesByTeam = {};
+    for (const v of carVoteRows.rows) {
+        (carVotesByTeam[v.team_id] ??= []).push({ signup_id: v.signup_id, car_name: v.car_name });
+    }
+
     for (const team of teams) {
         team.votes = votesByTeam[team.id] ?? {};
+        team.carVotes = carVotesByTeam[team.id] ?? [];
     }
 
     res.json({ teams, unassigned: unassignedRows.rows, timeslots: timeslotRows.rows });
+});
+
+app.get('/api/race-events/:id/car-classes', async (req, res) => {
+    const { rows } = await pool.query(
+        `SELECT rs.car_classes
+         FROM race_events re
+         JOIN race_series rs ON rs.id = re.race_series_id
+         WHERE re.id = $1`,
+        [req.params.id]
+    );
+    res.json({ carClasses: rows[0]?.car_classes ?? [] });
 });
 
 app.post('/api/race-events/:id/teams', async (req, res) => {
@@ -760,6 +843,32 @@ app.delete('/api/timeslots/:timeslotId/vote/:signupId', requireAuth, async (req,
     await pool.query(
         `DELETE FROM race_event_timeslot_votes WHERE timeslot_id = $1 AND signup_id = $2`,
         [req.params.timeslotId, req.params.signupId]
+    );
+    res.status(204).end();
+});
+
+app.post('/api/teams/:teamId/car-votes', requireAuth, async (req, res) => {
+    try {
+        const { signupId, carName } = req.body;
+
+        const { rows } = await pool.query(
+            `INSERT INTO race_event_car_votes (team_id, signup_id, car_name)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (team_id, signup_id) DO UPDATE SET car_name = excluded.car_name, voted_at = now()
+            RETURNING *`,
+            [req.params.teamId, signupId, carName]
+        );
+        res.status(201).json(rows[0]);
+    } catch (err) {
+        console.error('Failed to record car vote:', err.message);
+        res.status(500).json({ error: 'Failed to record car vote' });
+    }
+});
+
+app.delete('/api/teams/:teamId/car-votes/:signupId', requireAuth, async (req, res) => {
+    await pool.query(
+        `DELETE FROM race_event_car_votes WHERE team_id = $1 AND signup_id = $2`,
+        [req.params.teamId, req.params.signupId]
     );
     res.status(204).end();
 });
