@@ -3,6 +3,7 @@ import { RELAY_HTTP_URL } from '@/lib/relay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardHeader,
@@ -12,6 +13,7 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { carTypeImage } from '@/lib/carTypes';
+import { getTimeZoneAbbreviation, getUtcOffsetLabel } from '@/hooks/useTimeZone';
 
 export const DEFAULT_STINT_MINUTES = 60;
 
@@ -38,7 +40,7 @@ function deleteEntryDriver(id) {
 
 function toDatetimeLocalValue(date) {
   const pad = (n) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 
 function formatLocal(date, timezone) {
@@ -56,6 +58,13 @@ function formatLocal(date, timezone) {
 
 function driverKey(driver) {
   return driver.is_guest ? `guest:${driver.guest_name}` : `roster:${driver.driver_id}`;
+}
+
+function conflictingBlocks(blocks, signupId, start, end) {
+  if (!start || !end || signupId == null) return [];
+  return blocks.filter((b) =>
+    b.signup_id === signupId && new Date(b.start_at) < end && new Date(b.end_at) > start
+  );
 }
 
 // Groups consecutive stints by the same driver into one visual block
@@ -97,6 +106,10 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
   const [localMinutes, setLocalMinutes] = useState({});
   const debounceTimers = useRef({});
 
+  const signupIdByDriverKey = new Map(
+    group.roster.map((r) => [driverKey({ is_guest: r.is_guest, guest_name: r.guest_name, driver_id: r.driver_id }), r.signup_id])
+  );
+
   function debounced(key, fn, delay = 500) {
     clearTimeout(debounceTimers.current[key]);
     debounceTimers.current[key] = setTimeout(fn, delay);
@@ -120,27 +133,27 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
   function saveRaceStart(value) {
     setLocalStart(value);
     if (!value) return;
-    const iso = new Date(value).toISOString();
+    const iso = new Date(`${value}:00Z`).toISOString();
     saveRaceSettings({ raceStartAt: iso }).then(() => onChange?.());
   }
 
-function saveRaceLengthParts(hoursValue, minutesValue) {
-  const totalMinutes = (Number(hoursValue) || 0) * 60 + (Number(minutesValue) || 0);
-  if (!totalMinutes) return;
-  debounced('raceLength', () => {
-    saveRaceSettings({ raceLengthMinutes: totalMinutes }).then(() => onChange?.());
-  });
-}
+  function saveRaceLengthParts(hoursValue, minutesValue) {
+    const totalMinutes = (Number(hoursValue) || 0) * 60 + (Number(minutesValue) || 0);
+    if (!totalMinutes) return;
+    debounced('raceLength', () => {
+      saveRaceSettings({ raceLengthMinutes: totalMinutes }).then(() => onChange?.());
+    });
+  }
 
-function saveRaceLengthHours(value) {
-  setLengthHoursInput(value);
-  saveRaceLengthParts(value, lengthMinutesInput);
-}
+  function saveRaceLengthHours(value) {
+    setLengthHoursInput(value);
+    saveRaceLengthParts(value, lengthMinutesInput);
+  }
 
-function saveRaceLengthMinutes(value) {
-  setLengthMinutesInput(value);
-  saveRaceLengthParts(lengthHoursInput, value);
-}
+  function saveRaceLengthMinutes(value) {
+    setLengthMinutesInput(value);
+    saveRaceLengthParts(lengthHoursInput, value);
+  }
 
   function savePracticeMinutes(value) {
     setPracticeMinutesInput(value);
@@ -422,7 +435,7 @@ function saveRaceLengthMinutes(value) {
 
         {raceEnd && (
           <p className="text-sm text-muted-foreground">
-            Race ends {formatLocal(raceEnd, Intl.DateTimeFormat().resolvedOptions().timeZone)}
+            Race ends {formatLocal(raceEnd, 'UTC')} UTC
             {' — '}
             {formatDuration(Math.max(0, (raceEnd.getTime() - Date.now()) / 60000))} remaining
           </p>
@@ -463,7 +476,7 @@ function saveRaceLengthMinutes(value) {
         <div className="flex flex-col gap-2">
           <Label>Schedule — drag to reorder</Label>
           {groupConsecutiveStints(stints).map((block) => {
-            const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const localTz = 'UTC';
             const isMulti = block.items.length > 1;
             const first = block.items[0];
             const last = block.items[block.items.length - 1];
@@ -478,10 +491,10 @@ function saveRaceLengthMinutes(value) {
                     {first.driver.driver_name} — {stintCountLabel(block.items.length)}
                     {first.start && last.end && (
                       <span className="ml-2 font-normal text-muted-foreground">
-                        {formatLocal(first.start, localTz)} – {formatLocal(last.end, localTz)}
+                        {formatLocal(first.start, localTz)} – {formatLocal(last.end, localTz)} UTC
                         {first.driver.timezone && (
                           <span className="ml-2">
-                            — starts {formatLocal(first.start, first.driver.timezone)} their time
+                            — {formatLocal(first.start, first.driver.timezone)} – {formatLocal(last.end, first.driver.timezone)} {getTimeZoneAbbreviation(first.driver.timezone)} ({getUtcOffsetLabel(first.driver.timezone)})
                           </span>
                         )}
                       </span>
@@ -521,12 +534,22 @@ function saveRaceLengthMinutes(value) {
                     <div className="flex-1 text-sm text-muted-foreground">
                       {start && end ? (
                         <>
-                          {formatLocal(start, localTz)} – {formatLocal(end, localTz)}
+                          {formatLocal(start, localTz)} – {formatLocal(end, localTz)} UTC
                           {driver.timezone && (
                             <span className="ml-2">
-                              — starts {formatLocal(start, driver.timezone)} their time
+                              — Starts: {formatLocal(start, driver.timezone)} – Ends: {formatLocal(end, driver.timezone)} {getTimeZoneAbbreviation(driver.timezone)} ({getUtcOffsetLabel(driver.timezone)})
                             </span>
                           )}
+                          {conflictingBlocks(group.blocks ?? [], signupIdByDriverKey.get(driverKey(driver)), start, end).map((b) => (
+                            <Badge
+                              key={b.id}
+                              variant="secondary"
+                              title={`${b.severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}${b.reason ? ': ' + b.reason : ''} (${formatLocal(new Date(b.start_at), localTz)} – ${formatLocal(new Date(b.end_at), localTz)} UTC / ${formatLocal(new Date(b.start_at), driver.timezone)} – ${formatLocal(new Date(b.end_at), driver.timezone)} ${getTimeZoneAbbreviation(driver.timezone)} (${getUtcOffsetLabel(driver.timezone)}))`}
+                              className={`ml-2 gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-600'}`}
+                            >
+                              ⚠ {b.severity === 'blackout' ? 'Blackout conflict' : 'Avoid — sub-optimal'}
+                            </Badge>
+                          ))}
                         </>
                       ) : (
                         'Set a race start time'
@@ -555,9 +578,10 @@ function saveRaceLengthMinutes(value) {
               <span className="min-w-32 font-medium">Remaining time</span>
               <div className="flex-1 text-sm">
                 {formatDuration(remainingSlot.minutes)} unclaimed —{' '}
-                {formatLocal(remainingSlot.start, Intl.DateTimeFormat().resolvedOptions().timeZone)}
+                {formatLocal(remainingSlot.start, 'UTC')}
                 {' – '}
-                {formatLocal(remainingSlot.end, Intl.DateTimeFormat().resolvedOptions().timeZone)}
+                {formatLocal(remainingSlot.end, 'UTC')}
+                {' UTC'}
                 {' · use "Add Stint" above to take it'}
               </div>
             </div>

@@ -6,7 +6,7 @@ import { RELAY_HTTP_URL } from '@/lib/relay';
 import { useAuth } from '@/hooks/useAuth';
 import { X } from 'lucide-react';
 import { useRaceEventCarClasses } from '@/hooks/useRaceEventCarClasses';
-import { useTimezone, formatInTimezone, getUtcOffsetLabel, getTimeZoneAbbreviation, ordinalSuffix } from '@/hooks/useTimeZone';
+import { useTimezone, formatInTimezone, getUtcOffsetLabel, getTimeZoneAbbreviation, ordinalSuffix, zonedTimeToUtcIso } from '@/hooks/useTimeZone';
 import { useRaceEventSignups } from '@/hooks/useRaceEventSignups';
 
 
@@ -79,6 +79,40 @@ function TimeslotVoteSelect({ options, onSubmit }) {
                 className="border-murder-cyan"
             >
                 Vote
+            </Button>
+        </div>
+    );
+}
+
+function AvailabilityBlockForm({ driverTimezone, onSubmit }) {
+    const [startAt, setStartAt] = useState('');
+    const [endAt, setEndAt] = useState('');
+    const [severity, setSeverity] = useState('blackout');
+    const [reason, setReason] = useState('');
+
+    function submit() {
+        if (!startAt || !endAt) return;
+        const tz = driverTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        onSubmit({ startAt: zonedTimeToUtcIso(startAt, tz), endAt: zonedTimeToUtcIso(endAt, tz), severity, reason });
+    }
+
+    return (
+        <div className="flex flex-wrap items-center gap-1">
+            <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} className="h-7 w-44" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} className="h-7 w-44" />
+            <Select value={severity} onValueChange={setSeverity}>
+                <SelectTrigger className="h-7 w-32">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="blackout">Blackout</SelectItem>
+                    <SelectItem value="avoid">Prefer to avoid</SelectItem>
+                </SelectContent>
+            </Select>
+            <Input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="h-7 w-32" />
+            <Button variant="dark" size="sm" disabled={!startAt || !endAt} onClick={submit} className="border-murder-pink-dark">
+                Add
             </Button>
         </div>
     );
@@ -167,6 +201,21 @@ function RacePlanner() {
 
     function clearCarVote(teamId, signupId, carName) {
         fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/car-votes/${signupId}/${encodeURIComponent(carName)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(refetch);
+    }
+
+    function addAvailabilityBlock(signupId, block) {
+        fetch(`${RELAY_HTTP_URL}/api/signups/${signupId}/availability-blocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(block),
+        }).then(refetch);
+    }
+
+    function removeAvailabilityBlock(blockId) {
+        fetch(`${RELAY_HTTP_URL}/api/availability-blocks/${blockId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
         }).then(refetch);
@@ -477,7 +526,6 @@ function RacePlanner() {
                                                     );
                                                 })()}
                                             </div>
-
                                             <div className="flex flex-col divide-y divide-murder-cyan/20">
                                                 {t.members.map((m) => {
                                                     const memberCarVotes = t.carVotes?.filter((v) => v.signup_id === m.signup_id) ?? [];
@@ -549,6 +597,29 @@ function RacePlanner() {
                                                                                 </Button>
                                                                             </Badge>
                                                                         ))}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-xs text-muted-foreground">Blackout / Avoid</span>
+                                                                <div className="flex flex-wrap items-center gap-1">
+                                                                    <AvailabilityBlockForm driverTimezone={m.timezone} onSubmit={(block) => addAvailabilityBlock(m.signup_id, block)} />
+                                                                </div>
+                                                                <div className="flex flex-wrap items-center gap-1">
+                                                                    {(t.availabilityBlocks?.[m.signup_id] ?? []).map((b) => (
+                                                                        <Badge
+                                                                            key={b.id}
+                                                                            variant="secondary"
+                                                                            className={`gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-600'}`}
+                                                                        >
+                                                                            {b.severity === 'blackout' ? 'Blackout' : 'Avoid'}: {formatInTimezone(b.start_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(b.end_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })} UTC
+                                                                            {' / '}
+                                                                            {formatInTimezone(b.start_at, m.timezone, { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(b.end_at, m.timezone, { dateStyle: 'short', timeStyle: 'short' })} {getTimeZoneAbbreviation(m.timezone)} ({getUtcOffsetLabel(m.timezone)})
+                                                                            {b.reason && ` (${b.reason})`}
+                                                                            <Button variant="ghost" size="icon-sm" onClick={() => removeAvailabilityBlock(b.id)}>
+                                                                                <X className="size-3.5" />
+                                                                            </Button>
+                                                                        </Badge>
+                                                                    ))}
                                                                 </div>
                                                             </div>
                                                         </div>

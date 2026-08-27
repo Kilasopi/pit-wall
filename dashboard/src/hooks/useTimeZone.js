@@ -111,3 +111,22 @@ export function ordinalSuffix(day) {
     if (day % 10 === 3 && day % 100 !== 13) return 'rd';
     return 'th';
 }
+
+// useTimeZone.js — new export
+function getOffsetMinutes(timeZone, date) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone, hourCycle: 'h23',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(date).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+    const asIfUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    return (asIfUtc - date.getTime()) / 60000;
+}
+
+// Converts a "wall clock" datetime-local string (e.g. "2026-09-06T15:00")
+// that represents a time IN the given IANA zone into a real UTC instant.
+export function zonedTimeToUtcIso(dateTimeLocalStr, timeZone) {
+    const guess = new Date(`${dateTimeLocalStr}:00Z`);
+    const offsetMinutes = getOffsetMinutes(timeZone, guess);
+    return new Date(guess.getTime() - offsetMinutes * 60000).toISOString();
+}

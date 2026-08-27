@@ -5,6 +5,8 @@ import { useTeamRoster } from '@/hooks/useTeamRoster';
 import { useTeamRaceSettings } from '@/hooks/useTeamRaceSettings';
 import { StintGroup } from '@/components/StintGroup';
 import { Button } from '@/components/ui/button';
+import { useTeamAvailabilityBlocks } from '@/hooks/useTeamAvailabilityBlocks';
+
 
 function TeamStintPlannerPage() {
   const { teamId, raceEventId } = useParams();
@@ -12,8 +14,9 @@ function TeamStintPlannerPage() {
   const { data: drivers, loading: driversLoading, refetch: refetchDrivers } = useTeamEntryDrivers(teamId, token);
   const { data: roster, loading: rosterLoading } = useTeamRoster(teamId, token);
   const { data: raceSettings, loading: settingsLoading, save: saveRaceSettings, refetch: refetchSettings } = useTeamRaceSettings(teamId, token);
+  const { data: blocks, loading: blocksLoading } = useTeamAvailabilityBlocks(teamId, token);
 
-  if (driversLoading || rosterLoading || settingsLoading) {
+  if (driversLoading || rosterLoading || settingsLoading || blocksLoading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
@@ -30,6 +33,7 @@ function TeamStintPlannerPage() {
     roster,
     drivers,
     raceSettings,
+    blocks,
   };
 
   function handleChange() {

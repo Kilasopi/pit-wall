@@ -634,7 +634,7 @@ app.delete('/api/race-event-signups/:id', async (req, res) => {
 });
 
 app.get('/api/race-events/:id/teams', async (req, res) => {
-    const [teamRows, unassignedRows, timeslotRows, voteRows, carVoteRows] = await Promise.all([
+    const [teamRows, unassignedRows, timeslotRows, voteRows, carVoteRows, blockRows] = await Promise.all([
         pool.query(
             `SELECT
                 t.id AS team_id, t.name AS team_name, t.car_class,
@@ -690,6 +690,15 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
              WHERE t.race_event_id = $1`,
             [req.params.id]
         ),
+        pool.query(
+            `SELECT b.id, b.signup_id, b.start_at, b.end_at, b.severity, b.reason, m.team_id
+            FROM race_event_availability_blocks b
+            JOIN race_event_signups s ON s.id = b.signup_id
+            JOIN race_event_team_members m ON m.signup_id = b.signup_id
+            JOIN race_event_teams t ON t.id = m.team_id
+            WHERE t.race_event_id = $1`,
+            [req.params.id]
+        ),
     ]);
 
     const teams = [];
@@ -730,9 +739,16 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
         (carVotesByTeam[v.team_id] ??= []).push({ signup_id: v.signup_id, car_name: v.car_name });
     }
 
+    const blocksByTeam = {};
+    for (const b of blockRows.rows) {
+        (blocksByTeam[b.team_id] ??= {});
+        (blocksByTeam[b.team_id][b.signup_id] ??= []).push(b);
+    }
+
     for (const team of teams) {
         team.votes = votesByTeam[team.id] ?? {};
         team.carVotes = carVotesByTeam[team.id] ?? [];
+        team.availabilityBlocks = blocksByTeam[team.id] ?? {};
     }
 
     res.json({ teams, unassigned: unassignedRows.rows, timeslots: timeslotRows.rows });
@@ -938,6 +954,59 @@ app.delete('/api/teams/:teamId/lock-timeslot', requireAuth, async (req, res) => 
          WHERE id = $1`,
         [req.params.teamId]
     );
+    res.status(204).end();
+});
+
+app.get('/api/teams/:teamId/availability-blocks', requireAuth, async (req, res) => {
+    const { rows } = await pool.query(
+            `SELECT b.*
+            FROM race_event_availability_blocks b
+            JOIN race_event_team_members m ON m.signup_id = b.signup_id
+            WHERE m.team_id = $1
+            ORDER BY b.start_at`,
+            [req.params.teamId]
+    );
+    res.json(rows);
+});
+
+app.post('/api/signups/:signupId/availability-blocks', requireAuth, async (req, res) => {
+    try {
+        const { startAt, endAt, severity, reason } = req.body;
+        const { rows } = await pool.query(
+            `INSERT INTO race_event_availability_blocks (signup_id, start_at, end_at, severity, reason)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *`,
+            [req.params.signupId, startAt, endAt, severity, reason ?? null]
+        );
+        res.status(201).json(rows[0]);
+    } catch (err){
+        console.error('Failed to add availability blocks: ', err.message);
+        res.status(500).json({ error: 'Failed to add availability block' });
+    }
+})
+
+// Any team member (not just the block's owner) can edit — the scheduler
+// needs to shrink a driver's blackout to stop it overlapping an assigned
+// stint, without that driver needing to be the one to do it.
+app.patch('/api/availability-blocks/:id', requireAuth, async (req, res) => {
+    try {
+        const { startAt, endAt } = req.body;
+        const { rows } = await pool.query(
+            `UPDATE race_event_availability_blocks
+             SET start_at = COALESCE($1, start_at), end_at = COALESCE($2, end_at)
+             WHERE id = $3
+             RETURNING *`,
+            [startAt ?? null, endAt ?? null, req.params.id]
+        );
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('Failed to update availability block:', err.message);
+        res.status(500).json({ error: 'Failed to update availability block' });
+    }
+});
+
+app.delete('/api/availability-blocks/:id', requireAuth, async (req, res) => {
+    await pool.query('DELETE FROM race_event_availability_blocks WHERE id = $1', [req.params.id]);
     res.status(204).end();
 });
 
