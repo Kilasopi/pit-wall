@@ -34,6 +34,7 @@ function TeamStintPlannerPage() {
     eventName: drivers[0]?.event_name ?? raceSettings?.name,
     entryName: raceSettings?.name,
     carType: drivers[0]?.car_type ?? raceSettings?.car_class ?? null,
+    lockedCarName: raceSettings?.locked_car_name ?? null,
     roster,
     drivers,
     raceSettings,

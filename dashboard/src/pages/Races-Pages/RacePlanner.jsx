@@ -30,7 +30,9 @@ import {
 } from '@/components/ui/select';
 
 import { classifyCarName } from '@/components/RaceEventSignupForm';
+import { classColor } from '@/lib/carClasses';
 import { HelpPopover } from '@/components/HelpPopover';
+import { toast } from 'sonner';
 
 function CarVoteSelect({ carClass, carOptions, onSubmit }) {
     const [value, setValue] = useState('');
@@ -209,7 +211,7 @@ function AvailabilityBlockBadge({ block, driverTimezone, window, onSave, onRemov
         return (
             <Badge
                 variant="secondary"
-                className={`cursor-pointer gap-1 ${block.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-600'}`}
+                className={`cursor-pointer gap-1 ${block.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-murder-yellow text-murder-yellow-dark'}`}
                 onClick={() => setEditing(true)}
             >
                 {block.severity === 'blackout' ? 'Blackout' : 'Avoid'}: {formatInTimezone(block.start_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(block.end_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })} UTC
@@ -317,8 +319,14 @@ function RacePlanner() {
         }).then(refetch);
     }
 
-    function deleteTeam(teamId) {
-        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}`, { method: 'DELETE' }).then(refetch);
+    function deleteTeam(teamId, teamName) {
+        if (!confirm(`Delete ${teamName}? This can't be undone — all members will need to rejoin or form a new team.`)) return;
+        setDeletingTeamId(teamId);
+        fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}`, { method: 'DELETE' })
+            .then(refetch)
+            .then(() => toast.success(`${teamName} deleted`))
+            .catch(() => toast.error(`Failed to delete ${teamName}`))
+            .finally(() => setDeletingTeamId(null));
     }
 
     function addTimeslotVote(timeslotId, signupId) {
@@ -446,10 +454,13 @@ function RacePlanner() {
 
     const [newTeamClass, setNewTeamClass] = useState('');
     const [newTeamName, setNewTeamName] = useState('');
+    const [creatingTeam, setCreatingTeam] = useState(false);
+    const [deletingTeamId, setDeletingTeamId] = useState(null);
     const availableClasses = [...new Set([...unassigned.map((u) => u.car_class), ...teams.map((t) => t.car_class)])];
 
     function createTeam() {
         if (!newTeamClass || !newTeamName.trim()) return;
+        setCreatingTeam(true);
         fetch(`${RELAY_HTTP_URL}/api/race-events/${raceEventId}/teams`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -457,11 +468,16 @@ function RacePlanner() {
         }).then(() => {
             setNewTeamName('');
             refetch();
-        });
+            toast.success(`${newTeamName.trim()} created`);
+        }).catch(() => toast.error('Failed to create team'))
+        .finally(() => setCreatingTeam(false));
     }
 
     return(
-        <div className='min-h-screen bg-background p-6 text-foreground'>
+        <div>
+            <Link to="/races">
+                <Button variant="outline" size="sm" className="mb-4">← Back to Races</Button>
+            </Link>
             <div className="mb-4">
                 <h1 className="text-xl font-heading font-medium">{raceInfo?.event_name}</h1>
                 <p className="text-sm text-muted-foreground">
@@ -492,9 +508,15 @@ function RacePlanner() {
                             <div>
                                 <p className="mb-1 font-medium text-base">Cars by Class</p>
                                 {[...new Set(carClasses.map((name) => classifyCarName(name)))].map((cls) => (
-                                    <div key={cls} className="mb-1 gap-4">
-                                        <span className="text-sm font-semibold text-foreground">{cls}:</span>{' '}
-                                        {carClasses.filter((name) => classifyCarName(name) === cls).join(', ')}
+                                    <div key={cls} className="mb-1 flex items-start gap-2">
+                                        <span
+                                            className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                                            style={{ backgroundColor: classColor(cls) }}
+                                        />
+                                        <span>
+                                            <span className="text-sm font-semibold text-foreground">{cls}:</span>{' '}
+                                            {carClasses.filter((name) => classifyCarName(name) === cls).join(', ')}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -597,10 +619,10 @@ function RacePlanner() {
                                 variant="dark"
                                 size="sm"
                                 onClick={createTeam}
-                                disabled={!newTeamClass || !newTeamName.trim()}
+                                disabled={!newTeamClass || !newTeamName.trim() || creatingTeam}
                                 className="border-rounded-lg murder-shine border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--murder-fuchsia),var(--murder-cyan))_border-box]"
                             >
-                                Create Team
+                                {creatingTeam ? 'Creating…' : 'Create Team'}
                             </Button>
                         </div>
                         {teams.length > 0 && (
@@ -609,12 +631,24 @@ function RacePlanner() {
                                     {teams.map((t) => (
                                         <div key={t.id} className="py-6 first:pt-0 last:pb-0">
                                             <div className="mb-2 flex items-center gap-2">
-                                                <p className="font-medium text-lg">{t.name} — {t.car_class}</p>
+                                                <p className="flex items-center gap-2 font-medium text-lg">
+                                                    <span
+                                                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                        style={{ backgroundColor: classColor(t.car_class) }}
+                                                    />
+                                                    {t.name} — {t.car_class}
+                                                </p>
                                                 <Link to={`/races/${raceEventId}/teams/${t.id}/stintPlanner`}>
                                                     <Button variant="outline" size="sm">Stint Planner</Button>
                                                 </Link>
-                                                <Button variant="dark" size="sm" onClick={() => deleteTeam(t.id)} className='border-murder-pink-dark'>
-                                                    Delete Team
+                                                <Button
+                                                    variant="dark"
+                                                    size="sm"
+                                                    onClick={() => deleteTeam(t.id, t.name)}
+                                                    disabled={deletingTeamId === t.id}
+                                                    className='border-murder-pink-dark'
+                                                >
+                                                    {deletingTeamId === t.id ? 'Deleting…' : 'Delete Team'}
                                                 </Button>
                                             </div>
 
@@ -632,6 +666,10 @@ function RacePlanner() {
                                                                 <X className="size-3.5" />
                                                             </Button>
                                                         </Badge>
+                                                    ) : carClasses.filter((name) => classifyCarName(name) === t.car_class).length === 1 ? (
+                                                        <Badge variant="secondary">
+                                                            Confirmed — {carClasses.filter((name) => classifyCarName(name) === t.car_class)[0]}
+                                                        </Badge>
                                                     ) : tallyCarVotes(t).length === 0 ? (
                                                         <span className="text-xs text-muted-foreground">No votes yet</span>
                                                     ) : (
@@ -641,6 +679,7 @@ function RacePlanner() {
                                                                 variant="outline"
                                                                 size="sm"
                                                                 onClick={() => lockCar(t.id, carName)}
+                                                                className={count === t.members.length ? 'border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--murder-fuchsia),var(--murder-cyan))_border-box]' : ''}
                                                             >
                                                                 Confirm {carName} ({count}/{t.members.length})
                                                             </Button>
@@ -672,6 +711,7 @@ function RacePlanner() {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() => lockTimeslot(t.id, timeslotId)}
+                                                                    className={count === t.members.length ? 'border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--murder-fuchsia),var(--murder-cyan))_border-box]' : ''}
                                                                 >
                                                                     Confirm Slot {timeslots.findIndex((x) => x.id === timeslotId) + 1} ({count}/{t.members.length})
                                                                 </Button>
@@ -700,11 +740,12 @@ function RacePlanner() {
                                                     );
                                                 })()}
                                             </div>
-                                            <div className="flex flex-col divide-y divide-murder-cyan/20">
+                                            <div className="mt-3 flex flex-col divide-y divide-murder-cyan/20 border-t border-murder-cyan/20">
                                                 {t.members.map((m) => {
                                                     const memberCarVotes = t.carVotes?.filter((v) => v.signup_id === m.signup_id) ?? [];
+                                                    const classCarOptions = carClasses.filter((name) => classifyCarName(name) === t.car_class);
                                                     return (
-                                                        <div key={m.signup_id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+                                                        <div key={m.signup_id} className="flex flex-col gap-2 py-3 last:pb-0">
                                                             <div className="flex items-center justify-between">
                                                                 <div className="flex items-center gap-2">
                                                                     <p className="font-medium text-base">{m.name}</p>
@@ -729,13 +770,20 @@ function RacePlanner() {
                                                                     </HelpPopover>
                                                                 </div>
                                                                 <div className="flex flex-wrap items-center gap-1">
-                                                                    <CarVoteSelect
-                                                                        carClass={t.car_class}
-                                                                        carOptions={carClasses.filter(
-                                                                            (name) => !memberCarVotes.some((v) => v.car_name === name)
-                                                                        )}
-                                                                        onSubmit={(carName) => castCarVote(t.id, m.signup_id, carName)}
-                                                                    />
+                                                                    {classCarOptions.length > 1 && (
+                                                                        <CarVoteSelect
+                                                                            carClass={t.car_class}
+                                                                            carOptions={carClasses.filter(
+                                                                                (name) => !memberCarVotes.some((v) => v.car_name === name)
+                                                                            )}
+                                                                            onSubmit={(carName) => castCarVote(t.id, m.signup_id, carName)}
+                                                                        />
+                                                                    )}
+                                                                    {classCarOptions.length === 1 && (
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            Only car available: {classCarOptions[0]}
+                                                                        </span>
+                                                                    )}
                                                                     {memberCarVotes.map((v) => (
                                                                         <Badge key={v.car_name} variant="secondary" className="gap-1">
                                                                             {v.car_name}

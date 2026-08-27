@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,10 @@ import { RELAY_HTTP_URL } from '@/lib/relay';
 import { zonedTimeToUtcIso, getTimeZoneAbbreviation, getUtcOffsetLabel } from '@/hooks/useTimeZone';
 
 
-const PX_PER_HOUR = 130;
-const PX_PER_MINUTE = PX_PER_HOUR / 60;
+// The minimum readable scale — used as-is (with horizontal scroll) once a
+// race is long enough that stretching to fill the container would make an
+// hour too narrow to read; short races stretch past this to fill the width.
+const MIN_PX_PER_HOUR = 130;
 const ROW_HEIGHT = 28;
 const ROW_GAP = 6;
 
@@ -146,6 +148,19 @@ function AvailabilityBlockEditPanel({ block, driverTimezone, window, onCancel, o
 export function DriverAvailabilityOverview({ group, token, onChange }) {
   const [editingBlockId, setEditingBlockId] = useState(null);
   const [addingForSignupId, setAddingForSignupId] = useState(null);
+  const scrollRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const raceStartAt = group.raceSettings?.race_start_at ? new Date(group.raceSettings.race_start_at) : null;
   const preRaceMinutes = (group.raceSettings?.practice_minutes ?? 0) + (group.raceSettings?.quali_minutes ?? 0);
   const windowStart = raceStartAt ? new Date(raceStartAt.getTime() + preRaceMinutes * 60000) : null;
@@ -164,7 +179,10 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
   }
 
   const totalMinutes = (windowEnd.getTime() - windowStart.getTime()) / 60000;
-  const totalWidth = totalMinutes * PX_PER_MINUTE;
+  const totalHours = totalMinutes / 60;
+  const pxPerHour = containerWidth > 0 ? Math.max(MIN_PX_PER_HOUR, containerWidth / totalHours) : MIN_PX_PER_HOUR;
+  const pxPerMinute = pxPerHour / 60;
+  const totalWidth = totalMinutes * pxPerMinute;
 
   const availabilityWindow = (group.timeslots ?? []).length > 0 ? {
     start: new Date(Math.min(...group.timeslots.map((t) => new Date(t.start_at).getTime())) - 6 * 3600000),
@@ -172,7 +190,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
   } : { start: windowStart, end: windowEnd };
 
   function xFor(date) {
-    return Math.max(0, (date.getTime() - windowStart.getTime()) / 60000) * PX_PER_MINUTE;
+    return Math.max(0, (date.getTime() - windowStart.getTime()) / 60000) * pxPerMinute;
   }
 
   // Same accumulation StintGroup uses, so segments line up with the same clock,
@@ -208,9 +226,9 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
 
   const gridStyle = {
     backgroundImage:
-      `repeating-linear-gradient(to right, var(--border-strong, var(--border)) 0, var(--border-strong, var(--border)) 1px, transparent 1px, transparent ${PX_PER_HOUR}px), ` +
-      `repeating-linear-gradient(to right, var(--border) 0, var(--border) 1px, transparent 1px, transparent ${PX_PER_HOUR / 2}px), ` +
-      `repeating-linear-gradient(to right, color-mix(in srgb, var(--border) 50%, transparent) 0, color-mix(in srgb, var(--border) 50%, transparent) 1px, transparent 1px, transparent ${PX_PER_HOUR / 4}px)`,
+      `repeating-linear-gradient(to right, var(--border-strong, var(--border)) 0, var(--border-strong, var(--border)) 1px, transparent 1px, transparent ${pxPerHour}px), ` +
+      `repeating-linear-gradient(to right, var(--border) 0, var(--border) 1px, transparent 1px, transparent ${pxPerHour / 2}px), ` +
+      `repeating-linear-gradient(to right, color-mix(in srgb, var(--border) 50%, transparent) 0, color-mix(in srgb, var(--border) 50%, transparent) 1px, transparent 1px, transparent ${pxPerHour / 4}px)`,
   };
 
   return (
@@ -237,7 +255,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-x-auto">
+          <div ref={scrollRef} className="flex-1 overflow-x-auto">
             <div className="relative" style={{ width: totalWidth }}>
               <div className="absolute inset-0" style={gridStyle} />
               {nowX != null && (
@@ -283,7 +301,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
                           title={`${b.severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}${b.reason ? ': ' + b.reason : ''}`}
                           onClick={() => { setEditingBlockId(b.id); setAddingForSignupId(null); }}
                           className={`absolute top-0 rounded border-2 cursor-pointer ${
-                            b.severity === 'blackout' ? 'bg-destructive border-destructive' : 'bg-yellow-500 border-yellow-600'
+                            b.severity === 'blackout' ? 'bg-destructive border-destructive' : 'bg-murder-yellow border-murder-yellow-dark'
                           }`}
                           style={{
                             left: xFor(b.clippedStart),
@@ -299,7 +317,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
 
               <div className="flex" style={{ marginTop: 4 }}>
                 {hourMarks.map((h, i) => (
-                  <span key={i} className="text-[11px] text-muted-foreground" style={{ width: PX_PER_HOUR }}>
+                  <span key={i} className="text-[11px] text-muted-foreground" style={{ width: pxPerHour }}>
                     {formatClock(h)}
                   </span>
                 ))}
@@ -313,7 +331,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
             <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Blackout
           </span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span className="inline-block h-2 w-2 rounded-sm bg-yellow-500" /> Prefer to avoid
+            <span className="inline-block h-2 w-2 rounded-sm bg-murder-yellow" /> Prefer to avoid
           </span>
         </div>
         {editingBlockId && (() => {

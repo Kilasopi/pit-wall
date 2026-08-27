@@ -13,6 +13,7 @@ import SignupPage from './pages/SignupPage.jsx'
 import ClaimProfilePage from './pages/ClaimProfilePage.jsx'
 import { RequireAuth, RedirectIfAuthed } from './components/RequireAuth.jsx'
 import { useTheme } from './hooks/useTheme.js'
+import { Toaster } from 'sonner'
 
 
 function App() {
@@ -25,10 +26,11 @@ function App() {
   // that don't render NavBar/Spectate (which each also call useTheme() for
   // their own toggle button) still get themed correctly instead of always
   // showing up in light mode.
-  useTheme()
+  const { theme } = useTheme()
 
   return (
     <BrowserRouter>
+      <Toaster theme={theme} richColors position="bottom-right" />
       <Routes>
         <Route path="/" element={spectateHost ? <SpectateRoot /> : <RequireAuth><TeamSelectPage /></RequireAuth>} />
         <Route path="/t/:teamId/*" element={<RaceView />} />

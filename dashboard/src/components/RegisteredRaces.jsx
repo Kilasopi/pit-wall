@@ -55,7 +55,7 @@ export function RegisteredRaces() {
                     return (
                         <Card key={r.race_event_id}
                             onClick={() => navigate(`/races/${r.race_event_id}`)}
-                            className={`mb-2 cursor-pointer transition-colors hover:bg-accent/50 ${r.source === 'special_event' ? 'border border-blue-500 bg-blue-950/40' : ''}`}
+                            className={`mb-2 cursor-pointer transition-colors hover:bg-accent/50 ${r.source === 'special_event' ? 'border border-murder-cyan bg-murder-cyan/10' : ''}`}
                             >
                             <CardHeader>
                                 <CardTitle>

@@ -46,11 +46,14 @@
     --color-murder-pink-light: var(--murder-pink-light);
     --color-murder-pink-dark: var(--murder-pink-dark);
     --color-murder-fuchsia: var(--murder-fuchsia);
+    --color-murder-fuchsia-light: var(--murder-fuchsia-light);
     --color-murder-fuchsia-dark: var(--murder-fuchsia-dark);
     --color-murder-cyan: var(--murder-cyan);
     --color-murder-cyan-light: var(--murder-cyan-light);
     --color-murder-cyan-dark: var(--murder-cyan-dark);
     --color-murder-violet: var(--murder-violet);
+    --color-murder-violet-light: var(--murder-violet-light);
+    --color-murder-violet-dark: var(--murder-violet-dark);
     --color-murder-yellow: var(--murder-yellow);
     --color-murder-yellow-dark: var(--murder-yellow-dark);
     --radius-sm: calc(var(--radius) * 0.6);
@@ -98,17 +101,20 @@
     --murder-bg-start: #09070d;
     --murder-bg-mid: #1a0831;
     --murder-bg-end: #0a0911;
-    --murder-pink: #ec4899;
-    --murder-pink-light: #f472b6;
-    --murder-pink-dark: #db2777;
-    --murder-fuchsia: #d946ef;
-    --murder-fuchsia-dark: #c026d3;
-    --murder-cyan: #22d3ee;
-    --murder-cyan-light: #67e8f9;
-    --murder-cyan-dark: #0891b2;
-    --murder-violet: #8b5cf6;
-    --murder-yellow: #facc15;
-    --murder-yellow-dark: #eab308;
+    --murder-pink: #f0178e;
+    --murder-pink-light: #ff5cae;
+    --murder-pink-dark: #c4106e;
+    --murder-fuchsia: #c026e0;
+    --murder-fuchsia-light: #d666f0;
+    --murder-fuchsia-dark: #9a1cb3;
+    --murder-cyan: #1fd6e0;
+    --murder-cyan-light: #7ff0f5;
+    --murder-cyan-dark: #0e9aa8;
+    --murder-violet: #7c1fe0;
+    --murder-violet-light: #a566f0;
+    --murder-violet-dark: #5c14ad;
+    --murder-yellow: #ffcb05;
+    --murder-yellow-dark: #d9a900;
 }
 
 .dark {

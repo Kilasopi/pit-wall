@@ -13,6 +13,7 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { carTypeImage } from '@/lib/carTypes';
+import { carModelImage } from '@/lib/carModelImages';
 import { getTimeZoneAbbreviation, getUtcOffsetLabel } from '@/hooks/useTimeZone';
 
 export const DEFAULT_STINT_MINUTES = 60;
@@ -317,13 +318,13 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
     <Card>
       <CardHeader>
         <CardTitle>{group.entryName}</CardTitle>
-        {carTypeImage(group.carType) && (
+        {(carModelImage(group.lockedCarName) || carTypeImage(group.carType)) && (
           <CardAction>
             <img
-              src={carTypeImage(group.carType)}
-              alt={group.carType}
+              src={carModelImage(group.lockedCarName) ?? carTypeImage(group.carType)}
+              alt={group.lockedCarName ?? group.carType}
               className="h-10 w-auto"
-              title={group.carType}
+              title={group.lockedCarName ?? group.carType}
             />
           </CardAction>
         )}
@@ -545,7 +546,7 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
                               key={b.id}
                               variant="secondary"
                               title={`${b.severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}${b.reason ? ': ' + b.reason : ''} (${formatLocal(new Date(b.start_at), localTz)} – ${formatLocal(new Date(b.end_at), localTz)} UTC / ${formatLocal(new Date(b.start_at), driver.timezone)} – ${formatLocal(new Date(b.end_at), driver.timezone)} ${getTimeZoneAbbreviation(driver.timezone)} (${getUtcOffsetLabel(driver.timezone)}))`}
-                              className={`ml-2 gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-600'}`}
+                              className={`ml-2 gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-murder-yellow text-murder-yellow-dark'}`}
                             >
                               ⚠ {b.severity === 'blackout' ? 'Blackout conflict' : 'Avoid — sub-optimal'}
                             </Badge>
