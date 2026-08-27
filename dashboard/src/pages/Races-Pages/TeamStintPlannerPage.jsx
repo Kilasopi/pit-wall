@@ -6,6 +6,8 @@ import { useTeamRaceSettings } from '@/hooks/useTeamRaceSettings';
 import { StintGroup } from '@/components/StintGroup';
 import { Button } from '@/components/ui/button';
 import { useTeamAvailabilityBlocks } from '@/hooks/useTeamAvailabilityBlocks';
+import { DriverAvailabilityOverview } from '@/components/DriverAvailabilityOverview';
+import { useRaceEventTeams } from '@/hooks/useRaceEventTeams';
 
 
 function TeamStintPlannerPage() {
@@ -14,7 +16,8 @@ function TeamStintPlannerPage() {
   const { data: drivers, loading: driversLoading, refetch: refetchDrivers } = useTeamEntryDrivers(teamId, token);
   const { data: roster, loading: rosterLoading } = useTeamRoster(teamId, token);
   const { data: raceSettings, loading: settingsLoading, save: saveRaceSettings, refetch: refetchSettings } = useTeamRaceSettings(teamId, token);
-  const { data: blocks, loading: blocksLoading } = useTeamAvailabilityBlocks(teamId, token);
+  const { data: blocks, loading: blocksLoading, refetch: refetchBlocks } = useTeamAvailabilityBlocks(teamId, token);
+  const { timeslots } = useRaceEventTeams(raceEventId);
 
   if (driversLoading || rosterLoading || settingsLoading || blocksLoading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -34,6 +37,7 @@ function TeamStintPlannerPage() {
     drivers,
     raceSettings,
     blocks,
+    timeslots,
   };
 
   function handleChange() {
@@ -46,6 +50,7 @@ function TeamStintPlannerPage() {
       <Link to={`/races/${raceEventId}/racePlanner`}>
         <Button variant="outline" size="sm">← Back to Race Planner</Button>
       </Link>
+      <DriverAvailabilityOverview group={group} token={token} onChange={refetchBlocks} />
       <StintGroup group={group} onChange={handleChange} saveRaceSettings={saveRaceSettings} />
     </div>
   );

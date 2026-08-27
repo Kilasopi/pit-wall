@@ -84,36 +84,181 @@ function TimeslotVoteSelect({ options, onSubmit }) {
     );
 }
 
-function AvailabilityBlockForm({ driverTimezone, onSubmit }) {
-    const [startAt, setStartAt] = useState('');
-    const [endAt, setEndAt] = useState('');
+function dayOptionsInWindow(window, timezone) {
+    if (!window) return [];
+    const days = [];
+    const cursor = new Date(window.start);
+    cursor.setUTCHours(0, 0, 0, 0);
+    while (cursor <= window.end) {
+        const label = new Intl.DateTimeFormat(undefined, { timeZone: timezone, weekday: 'short', month: 'short', day: 'numeric' }).format(cursor);
+        const value = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(cursor);
+        days.push({ value, label });
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return [...new Map(days.map((d) => [d.value, d])).values()];
+}
+
+function isoToDayAndTime(iso, timezone) {
+    const date = new Date(iso);
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+    return { day, time };
+}
+
+function AvailabilityBlockForm({ driverTimezone, window, onSubmit }) {
+    const [open, setOpen] = useState(false);
+    const [day, setDay] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
     const [severity, setSeverity] = useState('blackout');
     const [reason, setReason] = useState('');
+    const tz = driverTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const days = dayOptionsInWindow(window, tz);
 
     function submit() {
-        if (!startAt || !endAt) return;
-        const tz = driverTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-        onSubmit({ startAt: zonedTimeToUtcIso(startAt, tz), endAt: zonedTimeToUtcIso(endAt, tz), severity, reason });
+        if (!day || !startTime || !endTime) return;
+        const startIso = zonedTimeToUtcIso(`${day}T${startTime}`, tz);
+        const endDay = endTime < startTime
+            ? new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+                .format(new Date(new Date(`${day}T00:00:00`).getTime() + 24 * 3600000))
+            : day;
+        const endIso = zonedTimeToUtcIso(`${endDay}T${endTime}`, tz);
+        if (window && (new Date(startIso) < window.start || new Date(endIso) > window.end)) {
+            alert('That falls outside the race weekend window.');
+            return;
+        }
+        onSubmit({ startAt: startIso, endAt: endIso, severity, reason });
+        setDay(''); setStartTime(''); setEndTime(''); setReason(''); setOpen(false);
+    }
+
+    if (!open) {
+        return <Button variant="outline" size="sm" onClick={() => setOpen(true)}>+ Add Blackout</Button>;
     }
 
     return (
-        <div className="flex flex-wrap items-center gap-1">
-            <Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} className="h-7 w-44" />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} className="h-7 w-44" />
-            <Select value={severity} onValueChange={setSeverity}>
-                <SelectTrigger className="h-7 w-32">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="blackout">Blackout</SelectItem>
-                    <SelectItem value="avoid">Prefer to avoid</SelectItem>
-                </SelectContent>
-            </Select>
-            <Input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="h-7 w-32" />
-            <Button variant="dark" size="sm" disabled={!startAt || !endAt} onClick={submit} className="border-murder-pink-dark">
-                Add
-            </Button>
+        <div className="flex flex-col gap-2 rounded-lg border border-input p-2">
+            <div className="flex gap-2">
+                <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Date ({getTimeZoneAbbreviation(tz)} {getUtcOffsetLabel(tz)})</label>
+                    <Select value={day} onValueChange={setDay}>
+                        <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Pick day" /></SelectTrigger>
+                        <SelectContent>
+                            {days.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Start Time:</label>
+                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 w-36" />
+                </div>
+                <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">End Time:</label>
+                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-8 w-36" />
+                </div>
+            </div>
+            <div className="flex gap-2">
+                <Select value={severity} onValueChange={setSeverity}>
+                    <SelectTrigger className="h-8 w-36">
+                        <SelectValue>{severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="blackout">Blackout</SelectItem>
+                        <SelectItem value="avoid">Prefer to avoid</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="h-8 flex-1" />
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button variant="dark" size="sm" disabled={!day || !startTime || !endTime} onClick={submit} className="border-murder-pink-dark">Add</Button>
+            </div>
+        </div>
+    );
+}
+
+function AvailabilityBlockBadge({ block, driverTimezone, window, onSave, onRemove }) {
+    const [editing, setEditing] = useState(false);
+    const tz = driverTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const startParts = isoToDayAndTime(block.start_at, tz);
+    const endParts = isoToDayAndTime(block.end_at, tz);
+    const [day, setDay] = useState(startParts.day);
+    const [startTime, setStartTime] = useState(startParts.time);
+    const [endTime, setEndTime] = useState(endParts.time);
+    const [severity, setSeverity] = useState(block.severity);
+    const [reason, setReason] = useState(block.reason ?? '');
+    const days = dayOptionsInWindow(window, tz);
+
+    function save() {
+        if (!day || !startTime || !endTime) return;
+        const startIso = zonedTimeToUtcIso(`${day}T${startTime}`, tz);
+        const endDay = endTime < startTime
+            ? new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+                .format(new Date(new Date(`${day}T00:00:00`).getTime() + 24 * 3600000))
+            : day;
+        const endIso = zonedTimeToUtcIso(`${endDay}T${endTime}`, tz);
+        if (window && (new Date(startIso) < window.start || new Date(endIso) > window.end)) {
+            alert('That falls outside the race weekend window.');
+            return;
+        }
+        onSave({ startAt: startIso, endAt: endIso, severity, reason });
+        setEditing(false);
+    }
+
+    if (!editing) {
+        return (
+            <Badge
+                variant="secondary"
+                className={`cursor-pointer gap-1 ${block.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-600'}`}
+                onClick={() => setEditing(true)}
+            >
+                {block.severity === 'blackout' ? 'Blackout' : 'Avoid'}: {formatInTimezone(block.start_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(block.end_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })} UTC
+                {' / '}
+                {formatInTimezone(block.start_at, tz, { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(block.end_at, tz, { dateStyle: 'short', timeStyle: 'short' })} {getTimeZoneAbbreviation(tz)} ({getUtcOffsetLabel(tz)})
+                {block.reason && ` (${block.reason})`}
+                <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); onRemove(); }}>
+                    <X className="size-3.5" />
+                </Button>
+            </Badge>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-2 rounded-lg border border-input p-2">
+            <div className="flex gap-2">
+                <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Date ({getTimeZoneAbbreviation(tz)} {getUtcOffsetLabel(tz)})</label>
+                    <Select value={day} onValueChange={setDay}>
+                        <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Pick day" /></SelectTrigger>
+                        <SelectContent>
+                            {days.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Start Time:</label>
+                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 w-36" />
+                </div>
+                <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">End Time:</label>
+                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-8 w-36" />
+                </div>
+            </div>
+            <div className="flex gap-2">
+                <Select value={severity} onValueChange={setSeverity}>
+                    <SelectTrigger className="h-8 w-36">
+                        <SelectValue>{severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="blackout">Blackout</SelectItem>
+                        <SelectItem value="avoid">Prefer to avoid</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="h-8 flex-1" />
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+                <Button variant="dark" size="sm" onClick={save} className="border-murder-pink-dark">Save</Button>
+            </div>
         </div>
     );
 }
@@ -150,6 +295,12 @@ function RacePlanner() {
     const raceInfo = registeredRaces.find((r) => String(r.race_event_id) === raceEventId);
     const carClasses = useRaceEventCarClasses(raceEventId);
     const { signups } = useRaceEventSignups(raceEventId);
+
+    const raceLengthMinutes = raceInfo?.length_minutes ?? 0;
+    const availabilityWindow = timeslots.length > 0 ? {
+        start: new Date(Math.min(...timeslots.map((t) => new Date(t.start_at).getTime())) - 6 * 3600000),
+        end: new Date(Math.max(...timeslots.map((t) => new Date(t.start_at).getTime())) + raceLengthMinutes * 60000 + 6 * 3600000),
+    } : null;
 
     const [viewerTimezone] = useTimezone('racePlanner', 'UTC');
 
@@ -218,6 +369,14 @@ function RacePlanner() {
         fetch(`${RELAY_HTTP_URL}/api/availability-blocks/${blockId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
+        }).then(refetch);
+    }
+
+    function updateAvailabilityBlock(blockId, patch) {
+        fetch(`${RELAY_HTTP_URL}/api/availability-blocks/${blockId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(patch),
         }).then(refetch);
     }
 
@@ -602,23 +761,18 @@ function RacePlanner() {
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="text-xs text-muted-foreground">Blackout / Avoid</span>
                                                                 <div className="flex flex-wrap items-center gap-1">
-                                                                    <AvailabilityBlockForm driverTimezone={m.timezone} onSubmit={(block) => addAvailabilityBlock(m.signup_id, block)} />
+                                                                    <AvailabilityBlockForm driverTimezone={m.timezone} window={availabilityWindow} onSubmit={(block) => addAvailabilityBlock(m.signup_id, block)} />
                                                                 </div>
                                                                 <div className="flex flex-wrap items-center gap-1">
                                                                     {(t.availabilityBlocks?.[m.signup_id] ?? []).map((b) => (
-                                                                        <Badge
+                                                                        <AvailabilityBlockBadge
                                                                             key={b.id}
-                                                                            variant="secondary"
-                                                                            className={`gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-yellow-500 text-yellow-600'}`}
-                                                                        >
-                                                                            {b.severity === 'blackout' ? 'Blackout' : 'Avoid'}: {formatInTimezone(b.start_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(b.end_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })} UTC
-                                                                            {' / '}
-                                                                            {formatInTimezone(b.start_at, m.timezone, { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(b.end_at, m.timezone, { dateStyle: 'short', timeStyle: 'short' })} {getTimeZoneAbbreviation(m.timezone)} ({getUtcOffsetLabel(m.timezone)})
-                                                                            {b.reason && ` (${b.reason})`}
-                                                                            <Button variant="ghost" size="icon-sm" onClick={() => removeAvailabilityBlock(b.id)}>
-                                                                                <X className="size-3.5" />
-                                                                            </Button>
-                                                                        </Badge>
+                                                                            block={b}
+                                                                            driverTimezone={m.timezone}
+                                                                            window={availabilityWindow}
+                                                                            onSave={(patch) => updateAvailabilityBlock(b.id, patch)}
+                                                                            onRemove={() => removeAvailabilityBlock(b.id)}
+                                                                        />
                                                                     ))}
                                                                 </div>
                                                             </div>

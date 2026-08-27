@@ -990,13 +990,13 @@ app.post('/api/signups/:signupId/availability-blocks', requireAuth, async (req, 
 // stint, without that driver needing to be the one to do it.
 app.patch('/api/availability-blocks/:id', requireAuth, async (req, res) => {
     try {
-        const { startAt, endAt } = req.body;
+        const { startAt, endAt, severity, reason } = req.body;
         const { rows } = await pool.query(
             `UPDATE race_event_availability_blocks
-             SET start_at = COALESCE($1, start_at), end_at = COALESCE($2, end_at)
-             WHERE id = $3
+             SET start_at = COALESCE($1, start_at), end_at = COALESCE($2, end_at), severity = COALESCE($3, severity), reason = COALESCE($4, reason)
+             WHERE id = $5
              RETURNING *`,
-            [startAt ?? null, endAt ?? null, req.params.id]
+            [startAt ?? null, endAt ?? null, severity ?? null, reason ?? null, req.params.id]
         );
         res.json(rows[0]);
     } catch (err) {
