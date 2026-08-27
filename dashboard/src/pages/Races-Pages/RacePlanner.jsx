@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 
 import { classifyCarName } from '@/components/RaceEventSignupForm';
+import { HelpPopover } from '@/components/HelpPopover';
 
 function CarVoteSelect({ carClass, carOptions, onSubmit }) {
     const [value, setValue] = useState('');
@@ -565,7 +566,13 @@ function RacePlanner() {
                     <CardContent>
                         <div className="mb-4 flex items-end gap-2">
                             <div>
-                                <p className='text-base font-medium'>Create New Team Entry</p>
+                                <div className="flex items-center gap-1">
+                                    <p className='text-base font-medium'>Create New Team Entry</p>
+                                    <HelpPopover label="What does creating a team do?">
+                                        <p>Creates an empty team entry for a car class — drivers then join it from the Unassigned Drivers list.</p>
+                                        <p className="mt-2">Each class (GT3, GTP, etc) needs its own team; signups are matched to classes automatically once they join.</p>
+                                    </HelpPopover>
+                                </div>
                                 <label className="mb-1 block text-sm text-muted-foreground">Car Class</label>
                                 <Select value={newTeamClass} onValueChange={setNewTeamClass}>
                                     <SelectTrigger className="w-40">
@@ -614,6 +621,10 @@ function RacePlanner() {
                                             <div className="mb-3 flex flex-col gap-2">
                                                 <div className="flex flex-wrap items-center gap-1">
                                                     <span className="text-xs text-muted-foreground">Car:</span>
+                                                    <HelpPopover label="How does car confirmation work?">
+                                                        <p>Each driver votes for a car below; the tally shows here as options to confirm.</p>
+                                                        <p className="mt-2">Confirming locks it in for the team, but it can always be unlocked and re-confirmed later if plans change.</p>
+                                                    </HelpPopover>
                                                     {t.locked_car_name ? (
                                                         <Badge variant="secondary" className="gap-1">
                                                             Confirmed — {t.locked_car_name}
@@ -639,6 +650,10 @@ function RacePlanner() {
 
                                                 <div className="flex flex-wrap items-center gap-1">
                                                     <span className="text-xs text-muted-foreground">Timeslot:</span>
+                                                    <HelpPopover label="How does timeslot confirmation work?">
+                                                        <p>Drivers vote for which start-time slot works for them; the tally shows here as options to confirm.</p>
+                                                        <p className="mt-2">Confirming sets the team's actual race start time — still reversible with unlock if the team needs to change it.</p>
+                                                    </HelpPopover>
                                                     {t.locked_timeslot_id ? (
                                                         <Badge variant="secondary">
                                                             Confirmed — Slot {timeslots.findIndex((x) => x.id === t.locked_timeslot_id) + 1}
@@ -706,7 +721,13 @@ function RacePlanner() {
                                                             </div>
 
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-muted-foreground">Car</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-muted-foreground">Car</span>
+                                                                    <HelpPopover label="What does voting for a car do?">
+                                                                        <p>This is just an interest signal — it doesn't reserve or confirm anything by itself.</p>
+                                                                        <p className="mt-2">Once enough votes are in, anyone on the team can confirm a car above, for the whole team.</p>
+                                                                    </HelpPopover>
+                                                                </div>
                                                                 <div className="flex flex-wrap items-center gap-1">
                                                                     <CarVoteSelect
                                                                         carClass={t.car_class}
@@ -731,7 +752,13 @@ function RacePlanner() {
                                                             </div>
 
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-muted-foreground">Availability</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-muted-foreground">Availability</span>
+                                                                    <HelpPopover label="What does voting for a timeslot do?">
+                                                                        <p>This is which start-time slots this driver could make it to — also just an interest signal, not a commitment.</p>
+                                                                        <p className="mt-2">This is separate from Blackout/Avoid below, which is about when a driver specifically can't or shouldn't drive.</p>
+                                                                    </HelpPopover>
+                                                                </div>
                                                                 <div className="flex flex-wrap items-center gap-1">
                                                                     <TimeslotVoteSelect
                                                                         options={timeslots
@@ -759,7 +786,14 @@ function RacePlanner() {
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-muted-foreground">Blackout / Avoid</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-muted-foreground">Blackout / Avoid</span>
+                                                                    <HelpPopover label="What do Blackout and Avoid mean?">
+                                                                        <p><strong>Blackout</strong> — the driver absolutely can't drive during this window (appointment, sleeping, etc).</p>
+                                                                        <p className="mt-2"><strong>Avoid</strong> — the driver could drive, but it's not ideal (fatigue, very late for their timezone).</p>
+                                                                        <p className="mt-2">Neither ever blocks scheduling — they just warn whoever's building the stint plan.</p>
+                                                                    </HelpPopover>
+                                                                </div>
                                                                 <div className="flex flex-wrap items-center gap-1">
                                                                     <AvailabilityBlockForm driverTimezone={m.timezone} window={availabilityWindow} onSubmit={(block) => addAvailabilityBlock(m.signup_id, block)} />
                                                                 </div>

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 
 const links = [
   { to: 'racePlanner', label: 'Race Planner' },
+  { to: 'help', label: 'Help' },
 ];
 
 export function RaceEventNav({ raceEventId }) {

@@ -3,6 +3,7 @@ import { NavBar } from '@/components/NavBar';
 import { RaceEventNav } from '@/components/RaceEventNav';
 import RacePlanner from './RacePlanner.jsx';
 import TeamStintPlannerPage from './TeamStintPlannerPage.jsx';
+import RaceHelpPage from './RaceHelpPage.jsx';
 
 function RaceEventPage() {
   const { raceEventId } = useParams();
@@ -18,6 +19,7 @@ function RaceEventPage() {
       <Routes>
         <Route index element={<Navigate to="racePlanner" replace />} />
         <Route path="racePlanner" element={<RacePlanner />} />
+        <Route path="help" element={<RaceHelpPage />} />
         <Route path="teams/:teamId/stintPlanner" element={<TeamStintPlannerPage />} />
       </Routes>
     </div>
