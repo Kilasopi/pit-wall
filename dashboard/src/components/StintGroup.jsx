@@ -315,19 +315,18 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
       : null;
 
   return (
-    <Card>
+    <div className="relative">
+      {(carModelImage(group.lockedCarName) || carTypeImage(group.carType)) && (
+        <img
+          src={carModelImage(group.lockedCarName) ?? carTypeImage(group.carType)}
+          alt={group.lockedCarName ?? group.carType}
+          className="absolute top-4 right-4 z-10 h-36 w-auto rounded-md object-cover"
+          title={group.lockedCarName ?? group.carType}
+        />
+      )}
+      <Card>
       <CardHeader>
         <CardTitle>{group.entryName}</CardTitle>
-        {(carModelImage(group.lockedCarName) || carTypeImage(group.carType)) && (
-          <CardAction>
-            <img
-              src={carModelImage(group.lockedCarName) ?? carTypeImage(group.carType)}
-              alt={group.lockedCarName ?? group.carType}
-              className="h-10 w-auto"
-              title={group.lockedCarName ?? group.carType}
-            />
-          </CardAction>
-        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-4">
@@ -589,6 +588,7 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
           )}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

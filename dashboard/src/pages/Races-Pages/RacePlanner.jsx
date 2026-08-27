@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from "react-router-dom";
 import { useRaceEventTeams } from "@/hooks/useRaceEventTeams";
 import { useDrivers } from '@/hooks/useDrivers';
@@ -400,6 +400,20 @@ function RacePlanner() {
         }).then(refetch);
     }
 
+    // If a team's class only has one car available, there's nothing to
+    // actually vote on — auto-confirm it for real (not just display it)
+    // so locked_car_name is genuinely set in the DB and flows through
+    // everywhere else (e.g. the stint planner's car photo).
+    useEffect(() => {
+        teams.forEach((t) => {
+            if (t.locked_car_name) return;
+            const options = carClasses.filter((name) => classifyCarName(name) === t.car_class);
+            if (options.length === 1) {
+                lockCar(t.id, options[0]);
+            }
+        });
+    }, [teams, carClasses]);
+
     function lockTimeslot(teamId, timeslotId) {
         fetch(`${RELAY_HTTP_URL}/api/teams/${teamId}/lock-timeslot`, {
             method: 'POST',
@@ -665,10 +679,6 @@ function RacePlanner() {
                                                             <Button variant="ghost" size="icon-sm" onClick={() => unlockCar(t.id)}>
                                                                 <X className="size-3.5" />
                                                             </Button>
-                                                        </Badge>
-                                                    ) : carClasses.filter((name) => classifyCarName(name) === t.car_class).length === 1 ? (
-                                                        <Badge variant="secondary">
-                                                            Confirmed — {carClasses.filter((name) => classifyCarName(name) === t.car_class)[0]}
                                                         </Badge>
                                                     ) : tallyCarVotes(t).length === 0 ? (
                                                         <span className="text-xs text-muted-foreground">No votes yet</span>
