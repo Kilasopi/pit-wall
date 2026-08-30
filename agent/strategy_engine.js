@@ -120,7 +120,11 @@ class StrategyEngine {
             this._currentDriver = driver;
             this._currentCarNumber = carNumber;
             this._currentCarName = carName;
-            this._lapAtStintStart = lap ?? 0;
+            // CarIdxLap is -1 before a car has completed its first lap
+            // (sitting on the grid, out lap not yet done) — treat that as
+            // 0 laps in, not -1, or the very first lap crossing reads as
+            // "1 lap completed" instead of 0.
+            this._lapAtStintStart = lap != null && lap >= 0 ? lap : 0;
             // Seed this driver's running total from whatever they'd already
             // accumulated in earlier stints this session (0 for a driver's
             // first stint) — a double stint never reaches this branch at

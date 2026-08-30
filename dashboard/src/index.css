@@ -56,6 +56,9 @@
     --color-murder-violet-dark: var(--murder-violet-dark);
     --color-murder-yellow: var(--murder-yellow);
     --color-murder-yellow-dark: var(--murder-yellow-dark);
+    --color-miami-pink: var(--miami-pink);
+    --color-vice-cyan: var(--vice-cyan);
+    --color-deep-purple: var(--deep-purple);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -115,6 +118,9 @@
     --murder-violet-dark: #5c14ad;
     --murder-yellow: #ffcb05;
     --murder-yellow-dark: #d9a900;
+    --miami-pink: #f0177e;
+    --vice-cyan: #1ac8d9;
+    --deep-purple: #6b2ba3;
 }
 
 .dark {

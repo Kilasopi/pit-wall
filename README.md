@@ -154,6 +154,38 @@ paused OAuth client registration; real verification of race-only features
 
 ## Roadmap notes
 
+#### TODO: track map direction + pit-lane offset still wrong for Silverstone GP — 2026-08-29
+Live-tested the track map today (first real verification, not just bundled
+data) for Silverstone GP (trackId 341). Flipped `direction` from -1 to 1 in
+`agent/data/track_settings.json`, believing that fixed the counterclockwise
+rotation — but a second live test afterward showed rotation still isn't
+right, so that fix didn't actually land / wasn't the right fix. Needs
+re-investigation from scratch rather than another blind sign flip. The
+`offset` value (0.8505) is also still wrong — car renders top-right of the
+map while in the pits, should be bottom-right near the real GP pit straight.
+Only confirmed wrong for this one track so far, other tracks in the bundled
+dataset are unverified. Both deferred until they can be diagnosed properly
+with the app open live rather than guessed at.
+
+#### TODO: fuel counter needs a units toggle + real calculator logic — 2026-08-29
+Fuel card currently shows litres only — add a gallons option/toggle.
+Separately, the laps-remaining estimate is a simple rolling
+laps-per-tank average ([README fuel model section](#fuel-model)); this
+needs a proper fuel calculator with real strategy logic (target lap
+consumption, stops-remaining math, safety margin, etc.) rather than just
+the rolling average — bigger piece of work, not a quick tweak.
+
+#### Live-tested 2026-08-29 solo AI session (Silverstone, GT3/GT4 mixed)
+Confirmed working: lap counters, incident logging (multiple real
+incidents logged correctly), Leaderboard, Gap Board (tested with a second
+driver present). Confirmed NOT working: local yellow / section-caution
+detection (flagged in the README's Track Info bullet as placeholder
+already — genuinely hard given iRacing has no per-section flag telemetry).
+Class name showing as "Class NNNN" instead of "GT3"/"GT4" is expected for
+an offline AI session, not a bug — iRacing doesn't populate real class
+names outside a real subscribed series. Still unverified: driver swap
+detection (needs a second real driver, can't test solo).
+
 #### MURDER-only scope for now — 2026-08-14
 Login/accounts (`users` table, JWT auth, claim-a-driver-profile flow) are
 being built MURDER-only for now — no multi-tenant/multi-team-org support.
