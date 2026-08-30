@@ -4,9 +4,11 @@
   "private": true,
   "description": "Sim PC service: reads iRacing SDK shared memory and streams telemetry to the agent over WebSocket",
   "main": "index.js",
+  "bin": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "build:exe": "pkg . --target node22-win-x64 --output dist/pitwall-collector.exe"
   },
   "engines": {
     "node": ">=18"
@@ -14,12 +16,20 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "pkg": {
+    "assets": [
+      "node_modules/@irsdk-node/native/prebuilds/**/*",
+      "!.env"
+    ]
+  },
+
   "dependencies": {
     "dotenv": "^17.4.2",
     "irsdk-node": "^4.4.0",
     "ws": "^8.21.1"
   },
   "devDependencies": {
+    "@yao-pkg/pkg": "^6.6.0",
     "nodemon": "^3.1.14"
   }
 }
