@@ -1,12 +1,17 @@
 require('dotenv').config({ path: __dirname + '/.env' });
 
-const agentHost = process.env.AGENT_HOST || 'localhost';
+const agentHost = process.env.AGENT_HOST || null;
 const agentPort = Number(process.env.AGENT_PORT) || 4100;
+
+// Ship-to-friends default: the Cloudflare tunnel, over wss on 443, no port.
+// Only used when AGENT_HOST isn't set — LAN/dev runs still override via .env.
+const agentUrl = process.env.AGENT_URL
+    || (agentHost ? `ws://${agentHost}:${agentPort}` : 'wss://agent.murder-pitwall.com');
 
 module.exports = {
     agentHost,
     agentPort,
-    agentUrl: `ws://${agentHost}:${agentPort}`,
+    agentUrl,
 
     // Set on a rig that's only ever spectating (not racing a real roster
     // entry) so the agent always buckets it under this fixed team instead
