@@ -154,6 +154,127 @@ paused OAuth client registration; real verification of race-only features
 
 ## Roadmap notes
 
+#### TODO for Windows session — 2026-08-30: package collector as a standalone exe
+Goal: friends can run the collector with zero installs beyond one exe — no
+git clone, no Node, no manual `.env` editing.
+
+Already done today (Work PC side):
+- Cloudflare tunnel now also routes `agent.murder-pitwall.com` →
+  `http://agent:4100` (added to `~/.cloudflared/config.yml`'s `ingress`
+  list, DNS route added via `cloudflared tunnel route dns`). Verified live:
+  collector on the Sim PC connected with `AGENT_HOST` unset/commented out
+  and got `Connected to agent at wss://agent.murder-pitwall.com`.
+- `collector/config.js` updated: when `AGENT_HOST` isn't set, `agentUrl`
+  now defaults to `wss://agent.murder-pitwall.com` instead of requiring a
+  LAN IP. `AGENT_HOST`/`AGENT_PORT` still override this for LAN/dev use
+  (build `ws://host:port` as before). This is the piece that needs to ship
+  inside the friend-facing exe with no `.env` present, so it falls through
+  to the tunnel automatically.
+- One disconnect/reconnect blip was observed right after the initial
+  tunnel connection during a live test — reconnected fine and stayed
+  connected through the session, but worth watching for repeated bounces
+  (possible keepalive/ping-timeout tuning needed for the proxied path vs.
+  raw LAN) if it recurs.
+
+Still to do — **must happen on a Windows machine** since `irsdk-node` is a
+native addon (Windows-only, compiled via node-gyp) and can't be built on
+the Linux Work PC:
+- Add `@yao-pkg/pkg` (maintained fork — original `vercel/pkg` is
+  deprecated) as a dev dependency in `collector/`.
+- Configure pkg targets (`node18-win-x64`) and mark `irsdk-node`'s native
+  `.node` file as an external asset to copy alongside the exe rather than
+  bundle inside it — pkg can't embed native addons, so the output will be
+  an exe + the native binary sitting next to it, not literally one file.
+- Build the exe **on the Sim PC or another Windows box** — the native
+  module has to compile on the target OS.
+- Test the resulting exe/folder locally on that Windows machine first
+  (does it run standalone, connect to the tunnel with no `.env`, read
+  live iRacing telemetry) before sending to a friend.
+- Decide how a friend would ever need to override the default (e.g. a
+  `TEAM_OVERRIDE` per friend, or LAN testing) — likely a `.env` file
+  dropped next to the exe, since `dotenv` already reads from
+  `collector/.env` relative to the script/exe location.
+- Not yet designed: how updates reach already-shipped collector exes.
+  Discussed options: (1) manually rebuild and resend the exe when
+  `collector/` changes, ideally with a version check so a stale collector
+  is obvious rather than silently misbehaving; (2) self-update on launch
+  against a known URL; (3) a thin launcher exe that always pulls latest
+  source + a bundled Node runtime. Leaning toward (1) for now given the
+  small trusted friend group and infrequent updates.
+
+#### Session summary — 2026-08-29: Garage61 access approved, architecture decisions
+Garage61 app approval came through today. Key decisions and findings:
+
+- **Personal access token, not OAuth2-per-driver.** Garage61's personal
+  token docs say it covers "my own data and that of the team," and this
+  was confirmed live: `GET /api/v1/teams/{id}/statistics` returns a full
+  per-driver breakdown for every team member (laps, clean laps, time on
+  track — see `relay/garage61.js`/`server.js` for the wiring). No need
+  for the fuller OAuth2 authorization-code flow originally scaffolded —
+  that code was stripped back down to a single `getAccessToken()`
+  reading `GARAGE61_ACCESS_TOKEN` from env.
+- **`drivers=` on `/laps` only accepts the literal `"me"`** — slug,
+  driver ULID, and iRacing account ID were all tried and rejected. To
+  get a specific teammate's laps, fetch unfiltered by track/car and
+  filter client-side by `driver.slug` in the response.
+- **Garage61 track IDs ≠ iRacing TrackIDs.** `/laps?tracks=` wants
+  Garage61's own internal track `id`, not iRacing's numeric
+  `platform_id`. `relay/garage61.js`'s `getGarage61TrackId()` builds a
+  `platform_id → id` lookup from `/tracks`, cached in memory with a
+  30-day refresh.
+- Filed three GitHub issues from tonight's design discussion:
+  - **#46** — Garage61-baseline stint planner (fastest lap + fuel/lap
+    baseline per driver/track/car) plus live stint-length projection
+    with planner block reflow. Reflow needs a new link between the live
+    `stints` table and the planning `entry_drivers` table (none exists
+    today — the planner's schedule is purely derived client-side each
+    render, no persisted timestamps).
+  - **#6** — the fuel calculator needs actual decision logic
+    (fuel-to-finish check, required pit-stop fuel amount, safety
+    margin, discrepancy warning vs. Garage61 baseline) on top of the
+    raw live number, which is a separate concern from the raw-number
+    bugs found tonight (see below).
+  - **#49** — remote pit service control from the dashboard (tire/fuel
+    selection, FR/WS toggles) triggering the actual in-sim pit
+    selection via `irsdk-node`'s `triggerPitChange`/`triggerPitCommand`.
+    The command round-trip (dashboard → agent → collector) is already
+    scaffolded from other features; the collector's command handler
+    just needs to call the real SDK functions instead of logging.
+- **Car Info page plan**: tire pressures + brake temps (not tire wear —
+  not reliably live, see below), a live mini dashboard (speed/RPM/gear),
+  and the pit command center from #49.
+- Added the Miami Vice brand palette (`miami-pink`/`vice-cyan`/
+  `deep-purple`) to `dashboard/src/index.css`.
+- **New feature idea, not yet designed**: allow adding custom
+  (non-scraped) events directly on the Schedule page, rather than only
+  showing events pulled in from the iRacing schedule scraper.
+
+#### TODO for next session — 2026-08-29
+- **Fuel calculator `_lastFuelLevel` bug**: `agent/fuel_calculator.js` sets
+  `_lastFuelLevel = FuelLevel` on every telemetry tick where `Lap` hasn't
+  changed yet (not just once when the lap starts). Since telemetry is
+  throttled to ~1/sec but a lap takes much longer, by the time a lap
+  boundary is detected `_lastFuelLevel` only reflects the fuel level from
+  about a second before the crossing, not from when the lap actually
+  began — so `used` (and therefore laps-remaining) is wildly wrong even
+  on clean, normal laps (seen live: 1650, then 1529 laps remaining when
+  the real max was ~11.9). Confirmed today, not yet fixed. Needs a
+  proper lap-start fuel snapshot taken once per lap, not slid forward
+  every tick.
+- **Verify tire temp °C/°F fix live**: raw `tempCL/CM/CR` telemetry
+  confirmed today to be native °C despite the field name/old code
+  comment claiming °F — fixed in `TireWearCard.jsx` (°C now shown raw,
+  °F computed from it). Not yet re-verified against real in-sim numbers
+  after the fix (only diagnosed from a screenshot vs. reported real
+  values).
+- **Tire temp/wear only updates at pit stops**: confirmed live — these
+  channels are frozen mid-stint, matching a known iRacing SDK limitation
+  (not our bug, telemetry is forwarded unfiltered). Worth labeling the
+  card honestly (e.g. "at last pit stop") instead of implying live data.
+- Decide build order and start on: Garage61 stint baseline (#46),
+  fuel calculator real logic (#6, fuel-to-finish/pit-amount/margin —
+  separate from the raw-number bug above), pit command center (#49).
+
 #### TODO: track map direction + pit-lane offset still wrong for Silverstone GP — 2026-08-29
 Live-tested the track map today (first real verification, not just bundled
 data) for Silverstone GP (trackId 341). Flipped `direction` from -1 to 1 in
