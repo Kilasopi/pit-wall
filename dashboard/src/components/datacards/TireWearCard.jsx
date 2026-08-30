@@ -6,9 +6,11 @@ import {
 } from "@/components/ui/card"
 
 // wear is the SDK's fraction of tread remaining (0-1); temp is already in
-// the SDK's native °F.
+// the SDK's native °C (confirmed against real in-sim readings — despite
+// the "tempC" field name suggesting otherwise, it is not °F).
 function TireSection({ label, wear, temp }) {
   const remaining = wear != null ? Math.min(100, Math.max(0, wear * 100)) : null
+  const tempF = temp != null ? (temp * 9) / 5 + 32 : null
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -21,7 +23,10 @@ function TireSection({ label, wear, temp }) {
       </div>
       <span className="text-xs font-bold">{remaining != null ? `${Math.round(remaining)}%` : '—'}</span>
       <span className="text-[10px] text-muted-foreground">
-        {temp != null ? `${Math.round(temp)}°` : '—'}
+        {tempF != null ? `${Math.round(tempF)}°F` : '—'}
+      </span>
+      <span className="text-[10px] text-muted-foreground">
+        {temp != null ? `${Math.round(temp)}°C` : '—'}
       </span>
     </div>
   )

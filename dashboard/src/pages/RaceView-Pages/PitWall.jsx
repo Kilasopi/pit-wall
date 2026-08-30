@@ -102,7 +102,11 @@ function PitWall({
           <Card>
             <CardHeader>
               <CardTitle>Incidents</CardTitle>
-              <CardDescription>{incidents.length} logged</CardDescription>
+              <CardDescription>
+                {incidents.length} logged
+                {incidents.length > 0 &&
+                  ` — ${incidents.reduce((sum, i) => sum + (i.points ?? 0), 0)}x total`}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {incidents.length > 0 ? (
