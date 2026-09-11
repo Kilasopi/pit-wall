@@ -94,10 +94,10 @@ function RosterDriversCard() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 col-span-3">
       <DriversTable
         endpoint="murder-drivers"
-        title="MURDER Drivers"
+        title="Team MURDER Drivers"
         description="Team roster"
         headerAction={
           <Button
@@ -175,7 +175,7 @@ function DriversPage() {
       </div>
       <NavBar />
 
-      <div className="grid items-start gap-4 md:grid-cols-2">
+      <div className="grid items-start gap-4 md:grid-cols-5">
         <RosterDriversCard />
       </div>
     </div>
