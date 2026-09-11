@@ -1,0 +1,1 @@
+ALTER TABLE murder_drivers ADD COLUMN IF NOT EXISTS discord_user_id TEXT;

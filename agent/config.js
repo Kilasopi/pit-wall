@@ -15,4 +15,10 @@ module.exports = {
     // without them.
     iracingEmail: process.env.IRACING_EMAIL,
     iracingPassword: process.env.IRACING_PASSWORD,
+
+    // Used for discord bot implementation:
+    discordBotToken: process.env.DISCORD_BOT_TOKEN,
+    discordNotifyChannelId: process.env.DISCORD_NOTIFY_CHANNEL_ID,
+    discordWarningMinutes: Number(process.env.DISCORD_WARNING_MINUTES) || 10,
+    discordWarningLaps: Number(process.env.DISCORD_WARNING_LAPS) || 3,
 };

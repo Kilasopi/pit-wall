@@ -102,6 +102,20 @@ function createStorage(databaseUrl) {
         async close() {
             await pool.end();
         },
+        
+        async getRosterForEntry(entryName) {
+            const { rows } = await pool.query(
+                `SELECT ed.stint_order, ed.stint_minutes, ed.race_start_at, ed.race_stint_minutes,
+                        COALESCE(md.nickname, md.name, ed.guest_name) AS driver_name,
+                        md.discord_user_id
+                FROM entry_drivers ed
+                LEFT JOIN murder_drivers md ON md.id = ed.driver_id
+                WHERE ed.entry_name = $1
+                ORDER BY ed.stint_order ASC`,
+                [entryName]
+            );
+            return rows;
+        },
     };
 }
 
