@@ -16,6 +16,8 @@ function qualifies(durations) {
 }
 
 function parseCadence(headerLine) {
+    if (!headerLine) return { biweekly: false, groups: [] };
+
     const biweekly = headerLine.includes("every other");
 
     const dayGroupPattern = /(Saturdays?|Sundays?)(.*?)GMT/g;
@@ -141,7 +143,7 @@ async function fetchScheduleEvents() {
     blocks.forEach((block) => {
         const durations = extractDuration(block);
         const carClasses = extractCarClasses(block);
-        
+
         if (qualifies(durations)) {
             const seriesName = block[0].replace(/\s*-?\s*2026 Season.*$/, "");
 
@@ -169,7 +171,6 @@ async function fetchScheduleEvents() {
             });
 
             results.push({ name: seriesName, source: 'schedule_pdf', carClasses, events: raceEvents });
-
         }
     });
     return results;
