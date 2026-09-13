@@ -101,6 +101,14 @@ app.get('/api/murder-drivers/unclaimed', async (req, res) => {
     res.json(rows);
 });
 
+app.get('/api/users/me', requireAuth, async (req, res) => {
+    const { rows } = await pool.query(
+        'SELECT id, username, driver_id FROM users WHERE id = $1',
+        [req.userId]
+    );
+    res.json(rows[0]);
+});
+
 app.post('/api/users/me/claim-driver', requireAuth, async (req, res) => {
     try {
         const { driverId } = req.body;
