@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,7 +30,7 @@ export function NavBar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { logout } = useAuth();
+  const { token, logout } = useAuth();
   const { teamId: slugParam } = useParams();
   const { slugToTeamId } = useTeamSlugs();
   const teamId = slugParam ? (slugToTeamId[slugParam] ?? slugParam) : undefined;
@@ -44,6 +45,22 @@ export function NavBar() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleLinkDriver = async () => {
+    try {
+      const res = await fetch(`${RELAY_HTTP_URL}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = await res.json();
+      if (user.driver_id) {
+        toast.info('This account is already linked to a driver.');
+      } else {
+        navigate('/claim-profile');
+      }
+    } catch {
+      toast.error('Could not check driver link status.');
+    }
   };
 
   return (
@@ -67,6 +84,13 @@ export function NavBar() {
           className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           Clear Session History
+        </Button>
+        <Button
+          type="button"
+          onClick={handleLinkDriver}
+          className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Link Driver
         </Button>
         <Button
           type="button"

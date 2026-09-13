@@ -34,9 +34,14 @@ export function FuelCard({
             </span>
 
             {fuelLitres !== undefined && (
-              <span className="text-sm text-muted-foreground">
-                {fuelLitres.toFixed(1)} L
-              </span>
+              <>
+                <span className="text-sm text-white/70">
+                  {fuelLitres.toFixed(1)} L
+                </span>
+                <span className="text-xs text-white/70">
+                  {(fuelLitres * 0.264172).toFixed(1)} gal
+                </span>
+              </>
             )}
           </div>
         </div>

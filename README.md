@@ -154,6 +154,25 @@ paused OAuth client registration; real verification of race-only features
 
 ## Roadmap notes
 
+#### TODO: Team M.U.R.D.E.R. recent races and performance page — 2026-08-31
+Idea: a page/section showing the team's recent race history and performance
+(results, trends) rather than just live in-session data. Not designed yet —
+needs to decide data source (Garage61? manual results entry?) and scope
+before building.
+
+#### TODO: track map wrong on Work PC but correct on Sim PC (VIR) — 2026-08-30
+Live-tested at VIR today. With the Pit Wall dashboard open on the **Work PC**,
+the car's position and direction on the track map were wrong — appeared to be
+going counter-clockwise (VIR is actually clockwise). With the **same live
+session**, the Pit Wall open on the **Sim PC** showed correct position and
+direction. Same data, same moment, two different results depending on which
+machine has the dashboard open — points at something client-side/rendering
+(browser, cached bundle, screen/viewport, or a stale build on one machine)
+rather than a data/telemetry bug, since the Sim PC's copy was correct. Not
+yet investigated further — needs comparing what each machine is actually
+serving/rendering (hard refresh, check bundle versions, diff track map config
+between the two).
+
 #### TODO for Windows session — 2026-08-30: package collector as a standalone exe
 Goal: friends can run the collector with zero installs beyond one exe — no
 git clone, no Node, no manual `.env` editing.

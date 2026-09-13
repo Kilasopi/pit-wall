@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 
 import { useTheme } from '@/hooks/useTheme';
@@ -179,9 +180,8 @@ function LoginPage() {
 
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="loginPassword">Password</Label>
-                                    <Input
+                                    <PasswordInput
                                         id="loginPassword"
-                                        type="password"
                                         value={password}
                                         onChange={(event) => setPassword(event.target.value)}
                                         required

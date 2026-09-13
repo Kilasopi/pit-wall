@@ -1,50 +1,32 @@
-// Fuel usage model: rolling laps-per-tank average from live FuelLevel/Lap
-// telemetry, producing a live laps-remaining estimate with no manual gauge
-// entry required.
-const ROLLING_WINDOW = 5;
-
+// Fuel usage model: laps-remaining estimate from the single most recently
+// completed lap's fuel usage (lastFuelLevel - currentFuelLevel), no
+// multi-lap averaging — reacts immediately to a genuine change in usage
+// (fuel-saving, pace change) instead of smoothing it out.
 class FuelCalculator {
     constructor() {
         this._lastLap = null;
-        this._lastFuelLevel = null;
-        this._recentUsage = [];
+        this._lapStartFuelLevel = null;
     }
 
-    // Feed one telemetry tick. Returns { lapsRemainingEst, source } when a
-    // new estimate is available (a lap just completed), otherwise null.
     ingest({ Lap, FuelLevel }) {
         if (typeof Lap !== 'number' || typeof FuelLevel !== 'number') return null;
 
         if (this._lastLap === null) {
             this._lastLap = Lap;
-            this._lastFuelLevel = FuelLevel;
+            this._lapStartFuelLevel = FuelLevel;
             return null;
         }
 
-        if (Lap === this._lastLap) {
-            this._lastFuelLevel = FuelLevel;
-            return null;
-        }
+        if (Lap === this._lastLap) return null;
 
-        const used = this._lastFuelLevel - FuelLevel;
+        const used = this._lapStartFuelLevel - FuelLevel;
         this._lastLap = Lap;
-        this._lastFuelLevel = FuelLevel;
+        this._lapStartFuelLevel = FuelLevel;
 
-        // A non-positive delta means the car refueled (or telemetry noise) —
-        // don't let a pit stop poison the rolling average.
-        if (used > 0) {
-            this._recentUsage.push(used);
-            if (this._recentUsage.length > ROLLING_WINDOW) this._recentUsage.shift();
-        }
-
-        if (this._recentUsage.length === 0) return null;
-
-        const avgUsagePerLap =
-            this._recentUsage.reduce((sum, v) => sum + v, 0) / this._recentUsage.length;
-        if (avgUsagePerLap <= 0) return null;
+        if (used <= 0) return null;
 
         return {
-            lapsRemainingEst: Math.round((FuelLevel / avgUsagePerLap) * 10) / 10,
+            lapsRemainingEst: Math.round((FuelLevel / used) * 10) / 10,
             source: 'telemetry',
         };
     }

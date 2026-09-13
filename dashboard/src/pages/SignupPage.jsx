@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/useTheme';
@@ -183,9 +184,8 @@ function SignupPage() {
 
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="registerPassword">Password</Label>
-                                    <Input
+                                    <PasswordInput
                                         id="registerPassword"
-                                        type="password"
                                         value={password}
                                         onChange={(event) => setPassword(event.target.value)}
                                         required
@@ -194,9 +194,8 @@ function SignupPage() {
 
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="registerConfirmPassword">Confirm Password</Label>
-                                    <Input
+                                    <PasswordInput
                                         id="registerConfirmPassword"
-                                        type="password"
                                         value={confirmPassword}
                                         onChange={(event) => setConfirmPassword(event.target.value)}
                                         required

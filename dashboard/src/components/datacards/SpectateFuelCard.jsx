@@ -31,19 +31,19 @@ export function SpectateFuelCard({ percentage, fuelLitres, lapsRemainingEst }) {
             </span>
 
             {fuelLitres !== undefined && (
-              <span className="text-xs text-muted-foreground">
-                {fuelLitres.toFixed(1)} L
+              <span className="text-xs text-white/70">
+                {fuelLitres.toFixed(1)} L / {(fuelLitres * 0.264172).toFixed(1)} gal
               </span>
             )}
           </div>
         </div>
 
         <dl className="grid grid-cols-2 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">Fuel Remaining</dt>
-          <dd>{fuelLitres != null ? `${fuelLitres.toFixed(1)} L` : '—'}</dd>
-          <dt className="text-muted-foreground">Percentage</dt>
+          <dt className="text-white/70">Fuel Remaining</dt>
+          <dd>{fuelLitres != null ? `${fuelLitres.toFixed(1)} L / ${(fuelLitres * 0.264172).toFixed(1)} gal` : '—'}</dd>
+          <dt className="text-white/70">Percentage</dt>
           <dd>{Math.round(fuelLevel)}%</dd>
-          <dt className="text-muted-foreground">Laps Remaining (est.)</dt>
+          <dt className="text-white/70">Laps Remaining (est.)</dt>
           <dd>{lapsRemainingEst ?? '—'}</dd>
         </dl>
       </CardContent>
