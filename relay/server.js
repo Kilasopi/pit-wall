@@ -391,6 +391,12 @@ async function saveScheduleEvents(results) {
             );
             const raceEventId = rows[0].id;
 
+            await pool.query(
+                `DELETE FROM race_event_timeslots
+                WHERE race_event_id = $1 AND start_at != ALL($2::timestamptz[])`,
+                [raceEventId, event.timeslots]
+            );
+
             for (const timeslot of event.timeslots) {
                 await pool.query(
                     `INSERT INTO race_event_timeslots (race_event_id, start_at)
@@ -507,17 +513,19 @@ refreshSpecialEvents();
 setInterval(refreshSpecialEvents, SPECIAL_EVENTS_REFRESH_MS);
 
 // Once a race has actually finished (last timeslot start + race length has
-// passed), the team/car/timeslot-voting setup for it is done being useful —
-// clear the team assignments so the planner doesn't keep showing stale
-// rosters for events that already happened. Signups themselves are left
-// alone since they're the historical "who registered" record.
-async function cleanupFinishedTeams() {
+// passed), the whole event row is done being useful — the schedule/special
+// events scrapers will re-add it if it's still upcoming next time they run,
+// so a finished event is just stale clutter. Delete it (and everything
+// hanging off it: signups, teams, votes, availability blocks) so it drops
+// off the Races/Registered Races pages and stops blocking signup removal.
+async function cleanupFinishedEvents() {
     try {
         const { rows } = await pool.query(`
             SELECT re.id
             FROM race_events re
             JOIN race_event_timeslots ts ON ts.race_event_id = re.id
-            WHERE EXISTS (SELECT 1 FROM race_event_teams t WHERE t.race_event_id = re.id)
+            JOIN race_series rs ON rs.id = re.race_series_id
+            WHERE rs.source IN ('schedule_pdf', 'special_event')
             GROUP BY re.id, re.length_minutes
             HAVING MAX(ts.start_at) + (COALESCE(re.length_minutes, 0) * INTERVAL '1 minute') < now()
         `);
@@ -525,17 +533,20 @@ async function cleanupFinishedTeams() {
         if (rows.length === 0) return;
 
         const eventIds = rows.map((r) => r.id);
+        // race_event_teams.race_event_id has no ON DELETE CASCADE, so clear
+        // teams (and their cascading members/votes) before the event itself.
         await pool.query(`DELETE FROM race_event_teams WHERE race_event_id = ANY($1::int[])`, [eventIds]);
-        console.log(`Cleared team assignments for ${eventIds.length} finished event(s)`);
+        await pool.query(`DELETE FROM race_events WHERE id = ANY($1::int[])`, [eventIds]);
+        console.log(`Removed ${eventIds.length} finished event(s)`);
     } catch (err) {
-        console.error('Failed to clean up finished event teams:', err.message);
+        console.error('Failed to clean up finished events:', err.message);
     }
 }
 
-const TEAM_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // every hour
+const EVENT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // every hour
 
-cleanupFinishedTeams();
-setInterval(cleanupFinishedTeams, TEAM_CLEANUP_INTERVAL_MS);
+cleanupFinishedEvents();
+setInterval(cleanupFinishedEvents, EVENT_CLEANUP_INTERVAL_MS);
 
 app.get('/api/special-events', async (req, res) => {
     const { rows: events } = await pool.query(
