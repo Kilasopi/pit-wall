@@ -87,7 +87,7 @@ function requireAuth(req, res, next) {
 
 app.get('/api/murder-drivers', async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT id, name, nickname, iracing_id, active, timezone FROM murder_drivers ORDER BY name'
+        'SELECT id, name, nickname, iracing_id, active, timezone, discord_user_id FROM murder_drivers ORDER BY name'
     );
     res.json(rows);
 });
@@ -315,6 +315,7 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
             iracingId,
             timezone,
             active,
+            discordUserId,
         } = req.body;
 
         const { rows } = await pool.query(
@@ -323,8 +324,9 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
                  nickname = $2,
                  iracing_id = $3,
                  timezone = $4,
-                 active = $5
-             WHERE id = $6
+                 active = $5,
+                 discord_user_id = $6
+             WHERE id = $7
              RETURNING *`,
             [
                 name,
@@ -332,6 +334,7 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
                 iracingId ?? null,
                 timezone ?? null,
                 active,
+                discordUserId?.trim() || null,
                 req.params.id,
             ]
         );

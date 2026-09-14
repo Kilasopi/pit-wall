@@ -94,7 +94,8 @@ function RosterDriversCard() {
   }
 
   return (
-    <div className="flex flex-col gap-4 col-span-3">
+    <div className="flex gap-4 col-span-5">
+      <div className="w-2/3 min-w-0">
       <DriversTable
         endpoint="murder-drivers"
         title="Team MURDER Drivers"
@@ -139,6 +140,15 @@ function RosterDriversCard() {
             ),
           },
           {
+            key: 'discord_user_id',
+            label: 'Discord',
+            render: (r) => (
+              <Badge variant={r.discord_user_id ? 'default' : 'outline'}>
+                {r.discord_user_id ? 'Connected' : 'Not connected'}
+              </Badge>
+            ),
+          },
+          {
             key: 'actions',
             label: '',
             render: (r) => (
@@ -154,13 +164,16 @@ function RosterDriversCard() {
           },
         ]}
       />
+      </div>
 
       {formTarget && (
-        <AddRosterDriverForm
-          driver={formTarget === 'new' ? null : formTarget}
-          onAdded={() => setFormTarget(null)}
-          onCancel={() => setFormTarget(null)}
-        />
+        <div className="flex-1 min-w-0">
+          <AddRosterDriverForm
+            driver={formTarget === 'new' ? null : formTarget}
+            onAdded={() => setFormTarget(null)}
+            onCancel={() => setFormTarget(null)}
+          />
+        </div>
       )}
     </div>
   );

@@ -27,6 +27,7 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
   const [iracingId, setIracingId] = useState(driver?.iracing_id ?? '');
   const [timezone, setTimezone] = useState(driver?.timezone ?? '');
   const [active, setActive] = useState(driver?.active ?? true);
+  const [discordUserId, setDiscordUserId] = useState(driver?.discord_user_id ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -50,6 +51,7 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
 
       if (isEditing) {
         body.active = active;
+        body.discordUserId = discordUserId.trim() || null;
       }
 
       const endpoint = isEditing
@@ -150,6 +152,18 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
               </SelectContent>
             </Select>
           </div>
+
+          {isEditing && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rosterDiscordId">Discord ID</Label>
+              <Input
+                id="rosterDiscordId"
+                value={discordUserId}
+                onChange={(event) => setDiscordUserId(event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          )}
 
           {isEditing && (
             <label className="flex items-center gap-2 text-sm">
