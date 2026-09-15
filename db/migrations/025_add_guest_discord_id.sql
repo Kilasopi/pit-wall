@@ -1,0 +1,1 @@
+ALTER TABLE entry_drivers ADD COLUMN guest_discord_id TEXT;

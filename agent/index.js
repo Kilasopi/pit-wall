@@ -5,11 +5,13 @@ const { FuelCalculator } = require('./fuel_calculator');
 const { StrategyEngine } = require('./strategy_engine');
 const { createStorage } = require('./storage');
 const { TrackMapService } = require('./track_map_service');
+const { createDiscordNotifier } = require('./discord_notifier');
 
 const server = new AgentWebSocketServer(config);
 const dashboard = new DashboardServer(config);
 const storage = config.databaseUrl ? createStorage(config.databaseUrl) : null;
 const trackMapService = new TrackMapService(config);
+const discordNotifier = createDiscordNotifier(config.discordBotToken, config.discordNotifyChannelId);
 
 // 100ms (10Hz) — most telemetry-driven UI doesn't need this fast, but the
 // track map's car dots visibly snap between positions at anything looser.
@@ -31,6 +33,7 @@ function getOrCreateTeam(teamId) {
             fuelCalculator: new FuelCalculator(),
             currentStintId: null,
             currentStintSummary: null,
+            stintWarningSent: false,
             lastLapsCompleted: 0,
             lastTelemetryBroadcastAt: 0,
             lastTrackMapId: null,
@@ -171,6 +174,7 @@ async function handleSwap(teamId, team, { driver, carNumber, carName, previousSe
     }
 
     team.lastLapsCompleted = 0;
+    team.stintWarningSent = false;
     team.currentStintSummary = { driver, carNumber, carName, startedAt: endedAt };
     const { totalLapsCompleted } = team.strategyEngine.currentDriver();
     dashboard.broadcast(
@@ -200,6 +204,31 @@ async function handleLap(teamId, team, { lapsCompletedThisStint, totalLapsComple
 
     if (storage && team.currentStintId !== null) {
         await storage.updateStintLaps(team.currentStintId, lapsCompletedThisStint);
+        
+    }
+    await checkStintWarning(teamId, team);
+}
+
+async function checkStintWarning(teamId, team) {
+    if (team.stintWarningSent || !storage || !team.currentStintSummary) return;
+
+    const roster = await storage.getRosterForEntry(teamId);
+    const currentIndex = roster.findIndex((r) => r.driver_name === team.currentStintSummary.driver);
+    if (currentIndex === -1) return;
+
+    const current = roster[currentIndex];
+    const next = roster[currentIndex + 1];
+    if (!next || current.stint_minutes == null) return;
+
+    const elapsedMinutes = (Date.now() - team.currentStintSummary.startedAt.getTime()) / 60000;
+    const remaining = current.stint_minutes - elapsedMinutes;
+
+    if (remaining <= config.discordWarningMinutes) {
+        team.stintWarningSent = true;
+        await discordNotifier.notifyDriver(
+            next.discord_user_id,
+            `You're up next in ${teamId} — current stint ends in ~${Math.max(0, Math.round(remaining))} min.`
+        );
     }
 }
 

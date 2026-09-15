@@ -1,0 +1,14 @@
+{
+  "name": "db",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Database migrations for pit-wall",
+  "main": "migrate.js",
+  "scripts": {
+    "migrate": "node migrate.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
+  }
+}

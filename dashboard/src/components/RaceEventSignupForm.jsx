@@ -63,7 +63,7 @@ export function classifyCarName(name) {
 }
 
 export function RaceEventSignupForm({ raceEventId, carClasses, onAdded, onCancel }) {
-    const { data: rosterDrivers } = useDrivers('murder-drivers');
+    const { data: rosterDrivers } = useDrivers('drivers');
     const availableCarClasses = deriveCarClasses(carClasses);
 
     const [driverId, setDriverId] = useState('');
