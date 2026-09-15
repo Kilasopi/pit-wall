@@ -85,16 +85,16 @@ function requireAuth(req, res, next) {
     }
 }
 
-app.get('/api/murder-drivers', async (req, res) => {
+app.get('/api/drivers', async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT id, name, nickname, iracing_id, active, timezone, discord_user_id FROM murder_drivers ORDER BY name'
+        'SELECT id, name, nickname, iracing_id, active, timezone, discord_user_id FROM drivers ORDER BY name'
     );
     res.json(rows);
 });
 
-app.get('/api/murder-drivers/unclaimed', async (req, res) => {
+app.get('/api/drivers/unclaimed', async (req, res) => {
     const { rows } = await pool.query(
-        `SELECT id, name FROM murder_drivers
+        `SELECT id, name FROM drivers
          WHERE id NOT IN (SELECT driver_id FROM users WHERE driver_id IS NOT NULL)
          ORDER BY name`
     );
@@ -146,7 +146,7 @@ app.get('/api/entry-drivers', async (req, res) => {
                ed.stint_order,
                ed.stint_minutes
         FROM entry_drivers ed
-        LEFT JOIN murder_drivers md ON md.id = ed.driver_id
+        LEFT JOIN drivers md ON md.id = ed.driver_id
         ORDER BY ed.event_name, ed.entry_name, ed.stint_order NULLS LAST, driver_name
     `);
     res.json(rows);
@@ -295,11 +295,11 @@ app.patch('/api/entry-drivers/:id', async (req, res) => {
     res.json(rows[0]);
 });
 
-app.post('/api/murder-drivers', async (req, res) => {
+app.post('/api/drivers', async (req, res) => {
     const { name, nickname, iracingId, timezone } = req.body;
 
     const { rows } = await pool.query(
-        `INSERT INTO murder_drivers (name, nickname, iracing_id, timezone)
+        `INSERT INTO drivers (name, nickname, iracing_id, timezone)
         VALUES ($1, $2, $3, $4)
         RETURNING *`,
         [name, nickname ?? null, iracingId ?? null, timezone ?? null]
@@ -307,7 +307,7 @@ app.post('/api/murder-drivers', async (req, res) => {
     res.status(201).json(rows[0]);
 });
 
-app.patch('/api/murder-drivers/:id', async (req, res) => {
+app.patch('/api/drivers/:id', async (req, res) => {
     try {
         const {
             name,
@@ -319,7 +319,7 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
         } = req.body;
 
         const { rows } = await pool.query(
-            `UPDATE murder_drivers
+            `UPDATE drivers
              SET name = $1,
                  nickname = $2,
                  iracing_id = $3,
@@ -352,9 +352,9 @@ app.patch('/api/murder-drivers/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/murder-drivers/:id', async (req, res) => {
+app.delete('/api/drivers/:id', async (req, res) => {
     try {
-        await pool.query('DELETE FROM murder_drivers WHERE id = $1', [req.params.id]);
+        await pool.query('DELETE FROM drivers WHERE id = $1', [req.params.id]);
         res.status(204).end();
     } catch (err) {
         if (err.code === '23503') {
@@ -590,7 +590,7 @@ app.get('/api/race-events/:id/signups', async (req, res) => {
     const { rows } = await pool.query(
         `SELECT s.*, d.name AS driver_name, d.nickname AS driver_nickname, d.timezone AS driver_timezone
          FROM race_event_signups s
-         LEFT JOIN murder_drivers d ON d.id = s.driver_id
+         LEFT JOIN drivers d ON d.id = s.driver_id
          WHERE s.race_event_id = $1
          ORDER BY s.signed_up_at`,
         [req.params.id]
@@ -666,7 +666,7 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
             FROM race_event_teams t
             LEFT JOIN race_event_team_members m ON m.team_id = t.id
             LEFT JOIN race_event_signups s ON s.id = m.signup_id
-            LEFT JOIN murder_drivers d ON d.id = s.driver_id
+            LEFT JOIN drivers d ON d.id = s.driver_id
             WHERE t.race_event_id = $1
             ORDER BY t.id`,
             [req.params.id]
@@ -680,7 +680,7 @@ app.get('/api/race-events/:id/teams', async (req, res) => {
             `SELECT s.id AS signup_id, s.car_class, s.driver_id, s.guest_name, s.guest_iracing_id,
                     d.name AS driver_name, d.nickname AS driver_nickname, d.iracing_id
              FROM race_event_signups s
-             LEFT JOIN murder_drivers d ON d.id = s.driver_id
+             LEFT JOIN drivers d ON d.id = s.driver_id
              WHERE s.race_event_id = $1
                AND NOT EXISTS (
                    SELECT 1
@@ -1042,7 +1042,7 @@ app.get('/api/teams/:teamId/entry-drivers', requireAuth, async (req, res) => {
                     ed.event_name, ed.entry_name, ed.car_number, ed.car_type,
                     ed.stint_order, ed.stint_minutes
              FROM entry_drivers ed
-             LEFT JOIN murder_drivers md ON md.id = ed.driver_id
+             LEFT JOIN drivers md ON md.id = ed.driver_id
              WHERE ed.team_id = $1
              ORDER BY ed.stint_order NULLS LAST`,
             [req.params.teamId]
@@ -1062,7 +1062,7 @@ app.get('/api/teams/:teamId/roster', requireAuth, async (req, res) => {
                 md.timezone
          FROM race_event_team_members m
          JOIN race_event_signups s ON s.id = m.signup_id
-         LEFT JOIN murder_drivers md ON md.id = s.driver_id
+         LEFT JOIN drivers md ON md.id = s.driver_id
          WHERE m.team_id = $1
          ORDER BY driver_name`,
         [req.params.teamId]

@@ -139,7 +139,7 @@ function AvailabilityBlockEditPanel({ block, driverTimezone, window, onCancel, o
                     <Button variant="ghost" size="sm" onClick={onRemove} className="text-destructive mr-auto">Remove</Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-                <Button variant="dark" size="sm" onClick={save} className="border-murder-pink-dark">Save</Button>
+                <Button variant="dark" size="sm" onClick={save} className="border-theme-pink-dark">Save</Button>
             </div>
         </div>
     );
@@ -301,7 +301,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
                           title={`${b.severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}${b.reason ? ': ' + b.reason : ''}`}
                           onClick={() => { setEditingBlockId(b.id); setAddingForSignupId(null); }}
                           className={`absolute top-0 rounded border-2 cursor-pointer ${
-                            b.severity === 'blackout' ? 'bg-destructive border-destructive' : 'bg-murder-yellow border-murder-yellow-dark'
+                            b.severity === 'blackout' ? 'bg-destructive border-destructive' : 'bg-theme-yellow border-theme-yellow-dark'
                           }`}
                           style={{
                             left: xFor(b.clippedStart),
@@ -331,7 +331,7 @@ export function DriverAvailabilityOverview({ group, token, onChange }) {
             <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Blackout
           </span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span className="inline-block h-2 w-2 rounded-sm bg-murder-yellow" /> Prefer to avoid
+            <span className="inline-block h-2 w-2 rounded-sm bg-theme-yellow" /> Prefer to avoid
           </span>
         </div>
         {editingBlockId && (() => {

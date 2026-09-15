@@ -50,9 +50,9 @@ function LoginPage() {
                     className="absolute inset-0"
                     style={{
                         background: `
-                            radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--murder-pink) 22%, transparent), transparent 30%),
-                            radial-gradient(circle at 85% 75%, color-mix(in oklab, var(--murder-cyan) 18%, transparent), transparent 32%),
-                            linear-gradient(145deg, var(--murder-bg-start) 0%, var(--murder-bg-mid) 42%, var(--murder-bg-end) 100%)
+                            radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--theme-pink) 22%, transparent), transparent 30%),
+                            radial-gradient(circle at 85% 75%, color-mix(in oklab, var(--theme-cyan) 18%, transparent), transparent 32%),
+                            linear-gradient(145deg, var(--theme-bg-start) 0%, var(--theme-bg-mid) 42%, var(--theme-bg-end) 100%)
                         `,
                     }}
                 />
@@ -74,20 +74,20 @@ function LoginPage() {
                     className="absolute -left-24 top-[22%] h-3 w-[135%] -rotate-12 opacity-80"
                     style={{
                         background:
-                            'linear-gradient(90deg, transparent 0%, transparent 10%, var(--murder-pink) 35%, var(--murder-fuchsia) 55%, transparent 85%, transparent 100%)',
+                            'linear-gradient(90deg, transparent 0%, transparent 10%, var(--theme-pink) 35%, var(--theme-fuchsia) 55%, transparent 85%, transparent 100%)',
                     }}
                 />
                 <div
                     className="absolute -left-20 top-[26%] h-1.5 w-[125%] -rotate-12 opacity-75"
                     style={{
                         background:
-                            'linear-gradient(90deg, transparent 0%, transparent 15%, var(--murder-cyan) 42%, transparent 82%)',
+                            'linear-gradient(90deg, transparent 0%, transparent 15%, var(--theme-cyan) 42%, transparent 82%)',
                     }}
                 />
 
                 {/* Glows */}
-                <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-murder-cyan/10 blur-3xl" />
-                <div className="absolute -right-32 top-8 h-80 w-80 rounded-full bg-murder-fuchsia/10 blur-3xl" />
+                <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-theme-cyan/10 blur-3xl" />
+                <div className="absolute -right-32 top-8 h-80 w-80 rounded-full bg-theme-fuchsia/10 blur-3xl" />
 
                 <div className="relative z-10 flex w-full flex-col justify-between">
                     {/* Top logo area */}
@@ -101,7 +101,7 @@ function LoginPage() {
                         </div>
 
                         <div>
-                            <div className="text-[10px] font-semibold tracking-[0.55em] text-murder-cyan-light">
+                            <div className="text-[10px] font-semibold tracking-[0.55em] text-theme-cyan-light">
                                 TEAM
                             </div>
                             <div className="text-xl font-black tracking-[0.15em]">
@@ -113,8 +113,8 @@ function LoginPage() {
                     {/* Main branding */}
                     <div>
                         <div className="mb-4 flex items-center gap-3">
-                            <div className="h-px w-10 bg-murder-pink" />
-                            <span className="text-xs font-semibold uppercase tracking-[0.4em] text-murder-pink-light">
+                            <div className="h-px w-10 bg-theme-pink" />
+                            <span className="text-xs font-semibold uppercase tracking-[0.4em] text-theme-pink-light">
                                 Racing
                             </span>
                         </div>
@@ -122,7 +122,7 @@ function LoginPage() {
                         <h1 className="max-w-xl font-heading text-5xl font-black uppercase leading-[0.92] tracking-tight lg:text-6xl">
                             Welcome to
                             <br />
-                            <span className="bg-linear-to-r from-murder-cyan-light via-murder-fuchsia to-murder-pink bg-clip-text text-transparent">
+                            <span className="bg-linear-to-r from-theme-cyan-light via-theme-fuchsia to-theme-pink bg-clip-text text-transparent">
                                 the Pit Wall
                             </span>
                         </h1>
@@ -141,9 +141,9 @@ function LoginPage() {
                         </span>
 
                         <div className="flex gap-1.5">
-                            <div className="h-1.5 w-6 bg-murder-cyan" />
-                            <div className="h-1.5 w-6 bg-murder-fuchsia" />
-                            <div className="h-1.5 w-2 bg-murder-yellow" />
+                            <div className="h-1.5 w-6 bg-theme-cyan" />
+                            <div className="h-1.5 w-6 bg-theme-fuchsia" />
+                            <div className="h-1.5 w-2 bg-theme-yellow" />
                         </div>
                     </div>
                 </div>

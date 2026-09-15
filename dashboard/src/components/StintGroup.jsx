@@ -564,7 +564,7 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
                               key={b.id}
                               variant="secondary"
                               title={`${b.severity === 'blackout' ? 'Blackout' : 'Prefer to avoid'}${b.reason ? ': ' + b.reason : ''} (${formatLocal(new Date(b.start_at), localTz)} – ${formatLocal(new Date(b.end_at), localTz)} UTC / ${formatLocal(new Date(b.start_at), driver.timezone)} – ${formatLocal(new Date(b.end_at), driver.timezone)} ${getTimeZoneAbbreviation(driver.timezone)} (${getUtcOffsetLabel(driver.timezone)}))`}
-                              className={`ml-2 gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-murder-yellow text-murder-yellow-dark'}`}
+                              className={`ml-2 gap-1 ${b.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-theme-yellow text-theme-yellow-dark'}`}
                             >
                               ⚠ {b.severity === 'blackout' ? 'Blackout conflict' : 'Avoid — sub-optimal'}
                             </Badge>

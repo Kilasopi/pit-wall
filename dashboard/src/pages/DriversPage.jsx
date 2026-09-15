@@ -83,7 +83,7 @@ function RosterDriversCard() {
 
   function removeDriver(id, name) {
     if (!confirm(`Remove ${name} from the roster?`)) return;
-    fetch(`${RELAY_HTTP_URL}/api/murder-drivers/${id}`, { method: 'DELETE' })
+    fetch(`${RELAY_HTTP_URL}/api/drivers/${id}`, { method: 'DELETE' })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -97,8 +97,8 @@ function RosterDriversCard() {
     <div className="flex gap-4 col-span-5">
       <div className="w-2/3 min-w-0">
       <DriversTable
-        endpoint="murder-drivers"
-        title="Team MURDER Drivers"
+        endpoint="drivers"
+        title="Drivers"
         description="Team roster"
         headerAction={
           <Button

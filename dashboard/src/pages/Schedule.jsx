@@ -58,8 +58,8 @@ function weekHighlightClass(dateValue) {
     const weekAfterStart = new Date(nextWeekStart);
     weekAfterStart.setDate(weekAfterStart.getDate() + 7);
 
-    if (date >= thisWeekStart && date < nextWeekStart) return 'border border-murder-violet bg-murder-violet/10';
-    if (date >= nextWeekStart && date < weekAfterStart) return 'border border-murder-yellow bg-murder-yellow/10';
+    if (date >= thisWeekStart && date < nextWeekStart) return 'border border-theme-violet bg-theme-violet/10';
+    if (date >= nextWeekStart && date < weekAfterStart) return 'border border-theme-yellow bg-theme-yellow/10';
     return '';
 }
 
@@ -126,15 +126,15 @@ function Schedule() {
                     {showLegend && (
                         <div className="absolute top-full right-0 z-10 mt-2 flex w-64 flex-col gap-1 rounded-md border bg-popover p-3 text-sm text-popover-foreground shadow-md">
                             <div className="flex items-center gap-2">
-                                <span className="h-3 w-3 rounded-sm border border-murder-violet bg-murder-violet/10" />
+                                <span className="h-3 w-3 rounded-sm border border-theme-violet bg-theme-violet/10" />
                                 <span>Events Happening This Week</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="h-3 w-3 rounded-sm border border-murder-yellow bg-murder-yellow/10" />
+                                <span className="h-3 w-3 rounded-sm border border-theme-yellow bg-theme-yellow/10" />
                                 <span>Events Happening Next Week</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="h-3 w-3 rounded-sm border border-murder-cyan bg-murder-cyan/10" />
+                                <span className="h-3 w-3 rounded-sm border border-theme-cyan bg-theme-cyan/10" />
                                 <span>Special Events</span>
                             </div>
                         </div>
@@ -206,7 +206,7 @@ function Schedule() {
                                 .map((event) => {
                             const highlight = weekHighlightClass(event.timeslots?.[0] ?? event.dateRange?.start);
                             return (
-                            <Card key={event.name} className={`mb-2 ${highlight || 'bg-murder-cyan/10'}`}>
+                            <Card key={event.name} className={`mb-2 ${highlight || 'bg-theme-cyan/10'}`}>
                                 <CardContent>
                                     <p className="font-medium">
                                         {event.name}

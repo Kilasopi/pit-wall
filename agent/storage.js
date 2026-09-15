@@ -1,6 +1,6 @@
 // Postgres access for stint/fuel/incident history. Same schema relay
 // already uses (db/schema.sql) — this only touches the stints,
-// fuel_readings, incidents, murder_drivers, and entry_drivers tables.
+// fuel_readings, incidents, drivers, and entry_drivers tables.
 const { Pool } = require('pg');
 
 function createStorage(databaseUrl) {
@@ -98,7 +98,7 @@ function createStorage(databaseUrl) {
                         COALESCE(md.nickname, md.name, ed.guest_name) AS driver_name,
                         md.discord_user_id
                 FROM entry_drivers ed
-                LEFT JOIN murder_drivers md ON md.id = ed.driver_id
+                LEFT JOIN drivers md ON md.id = ed.driver_id
                 WHERE ed.entry_name = $1
                 ORDER BY ed.stint_order ASC`,
                 [entryName]

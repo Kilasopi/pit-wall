@@ -20,7 +20,7 @@ import { CAR_TYPES } from '@/lib/carTypes';
 const CUSTOM_EVENT = '__custom__';
 
 export function AddEntryDriverForm({ onAdded }) {
-  const { data: roster } = useDrivers('murder-drivers');
+  const { data: roster } = useDrivers('drivers');
   const specialEvents = useSpecialEvents();
   const [mode, setMode] = useState('roster'); // 'roster' | 'guest'
   const [selectedIds, setSelectedIds] = useState([]);
@@ -180,7 +180,7 @@ export function AddEntryDriverForm({ onAdded }) {
               id="entryName"
               value={entryName}
               onChange={(e) => setEntryName(e.target.value)}
-              placeholder="e.g. MURDER1"
+              placeholder="e.g. Team1"
             />
           </div>
 

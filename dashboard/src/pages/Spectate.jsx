@@ -39,7 +39,7 @@ function Spectate({ session, telemetry, stint, displayName, trackMap, fuel }) {
 
     const { theme, toggleTheme } = useTheme();
     
-    // Find the car ID for Team MURDER
+    // Find the car ID for our team
     const drivers = session?.DriverInfo?.Drivers ?? [];
     const playerCarIdx = drivers.find(
         (d) => String(d.CarNumber) === String(stint?.carNumber)
@@ -70,7 +70,7 @@ function Spectate({ session, telemetry, stint, displayName, trackMap, fuel }) {
 
     // Session Info
     const sessionTimeRem = formatTimeRemaining(telemetry?.SessionTimeRemain);
-    const laps = telemetry?.CarIdxLap?.[playerCarIdx]; // Total laps team MURDER
+    const laps = telemetry?.CarIdxLap?.[playerCarIdx]; // Total laps for our team
     
     // Car Info
     const carName = stint?.carName;
@@ -197,7 +197,7 @@ function Spectate({ session, telemetry, stint, displayName, trackMap, fuel }) {
             <Card>
                 <CardHeader>
                     <CardTitle>Leaderboard</CardTitle>
-                    <CardDescription>Around Team MURDER</CardDescription>
+                    <CardDescription>Around Our Team</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>

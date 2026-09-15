@@ -50,7 +50,7 @@ function CarVoteSelect({ carClass, carOptions, onSubmit }) {
                     ))}
                 </SelectContent>
             </Select>
-            <Button variant="dark" size="sm" className="border-murder-fuchsia" disabled={!value} onClick={() => { onSubmit(value); setValue(''); }}>
+            <Button variant="dark" size="sm" className="border-theme-fuchsia" disabled={!value} onClick={() => { onSubmit(value); setValue(''); }}>
                 Vote
             </Button>
         </div>
@@ -79,7 +79,7 @@ function TimeslotVoteSelect({ options, onSubmit }) {
                 size="sm"
                 disabled={!value}
                 onClick={() => { onSubmit(Number(value)); setValue(''); }}
-                className="border-murder-cyan"
+                className="border-theme-cyan"
             >
                 Vote
             </Button>
@@ -173,7 +173,7 @@ function AvailabilityBlockForm({ driverTimezone, window, onSubmit }) {
             </div>
             <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button variant="dark" size="sm" disabled={!day || !startTime || !endTime} onClick={submit} className="border-murder-pink-dark">Add</Button>
+                <Button variant="dark" size="sm" disabled={!day || !startTime || !endTime} onClick={submit} className="border-theme-pink-dark">Add</Button>
             </div>
         </div>
     );
@@ -211,7 +211,7 @@ function AvailabilityBlockBadge({ block, driverTimezone, window, onSave, onRemov
         return (
             <Badge
                 variant="secondary"
-                className={`cursor-pointer gap-1 ${block.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-murder-yellow text-murder-yellow-dark'}`}
+                className={`cursor-pointer gap-1 ${block.severity === 'blackout' ? 'border-destructive text-destructive' : 'border-theme-yellow text-theme-yellow-dark'}`}
                 onClick={() => setEditing(true)}
             >
                 {block.severity === 'blackout' ? 'Blackout' : 'Avoid'}: {formatInTimezone(block.start_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })}–{formatInTimezone(block.end_at, 'UTC', { dateStyle: 'short', timeStyle: 'short' })} UTC
@@ -260,7 +260,7 @@ function AvailabilityBlockBadge({ block, driverTimezone, window, onSave, onRemov
             </div>
             <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
-                <Button variant="dark" size="sm" onClick={save} className="border-murder-pink-dark">Save</Button>
+                <Button variant="dark" size="sm" onClick={save} className="border-theme-pink-dark">Save</Button>
             </div>
         </div>
     );
@@ -544,7 +544,7 @@ function RacePlanner() {
                                                         <Badge
                                                             key={tz}
                                                             variant="secondary"
-                                                            className={`text-xs font-normal ${tz === 'UTC' ? 'border-murder-fuchsia text-murder-fuchsia' : ''}`}
+                                                            className={`text-xs font-normal ${tz === 'UTC' ? 'border-theme-fuchsia text-theme-fuchsia' : ''}`}
                                                         >
                                                             {format(tz)}
                                                         </Badge>
@@ -619,14 +619,14 @@ function RacePlanner() {
                                 size="sm"
                                 onClick={createTeam}
                                 disabled={!newTeamClass || !newTeamName.trim() || creatingTeam}
-                                className="border-rounded-lg murder-shine border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--murder-fuchsia),var(--murder-cyan))_border-box]"
+                                className="border-rounded-lg theme-shine border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--theme-fuchsia),var(--theme-cyan))_border-box]"
                             >
                                 {creatingTeam ? 'Creating…' : 'Create Team'}
                             </Button>
                         </div>
                         {teams.length > 0 && (
                             <div className="mb-4">
-                                <div className="flex flex-col divide-y divide-murder-fuchsia/30">
+                                <div className="flex flex-col divide-y divide-theme-fuchsia/30">
                                     {teams.map((t) => (
                                         <div key={t.id} className="py-6 first:pt-0 last:pb-0">
                                             <div className="mb-2 flex items-center gap-2">
@@ -645,7 +645,7 @@ function RacePlanner() {
                                                     size="sm"
                                                     onClick={() => deleteTeam(t.id, t.name)}
                                                     disabled={deletingTeamId === t.id}
-                                                    className='border-murder-pink-dark'
+                                                    className='border-theme-pink-dark'
                                                 >
                                                     {deletingTeamId === t.id ? 'Deleting…' : 'Delete Team'}
                                                 </Button>
@@ -674,7 +674,7 @@ function RacePlanner() {
                                                                 variant="outline"
                                                                 size="sm"
                                                                 onClick={() => lockCar(t.id, carName)}
-                                                                className={count === t.members.length ? 'border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--murder-fuchsia),var(--murder-cyan))_border-box]' : ''}
+                                                                className={count === t.members.length ? 'border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--theme-fuchsia),var(--theme-cyan))_border-box]' : ''}
                                                             >
                                                                 Confirm {carName} ({count}/{t.members.length})
                                                             </Button>
@@ -706,7 +706,7 @@ function RacePlanner() {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() => lockTimeslot(t.id, timeslotId)}
-                                                                    className={count === t.members.length ? 'border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--murder-fuchsia),var(--murder-cyan))_border-box]' : ''}
+                                                                    className={count === t.members.length ? 'border-2 border-transparent bg-origin-border [background:linear-gradient(var(--card),var(--card))_padding-box,linear-gradient(to_right,var(--theme-fuchsia),var(--theme-cyan))_border-box]' : ''}
                                                                 >
                                                                     Confirm Slot {timeslots.findIndex((x) => x.id === timeslotId) + 1} ({count}/{t.members.length})
                                                                 </Button>
@@ -735,7 +735,7 @@ function RacePlanner() {
                                                     );
                                                 })()}
                                             </div>
-                                            <div className="mt-3 flex flex-col divide-y divide-murder-cyan/20 border-t border-murder-cyan/20">
+                                            <div className="mt-3 flex flex-col divide-y divide-theme-cyan/20 border-t border-theme-cyan/20">
                                                 {t.members.map((m) => {
                                                     const memberCarVotes = t.carVotes?.filter((v) => v.signup_id === m.signup_id) ?? [];
                                                     const classCarOptions = carClasses.filter((name) => classifyCarName(name) === t.car_class);
@@ -751,7 +751,7 @@ function RacePlanner() {
                                                                     )}
                                                                 </div>
 
-                                                                <Button variant="dark" size="sm" onClick={() => leaveTeam(m.signup_id)} className="border-murder-violet">
+                                                                <Button variant="dark" size="sm" onClick={() => leaveTeam(m.signup_id)} className="border-theme-violet">
                                                                     Leave Team
                                                                 </Button>
                                                             </div>

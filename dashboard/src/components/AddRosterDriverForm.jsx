@@ -55,8 +55,8 @@ export function AddRosterDriverForm({ driver, onAdded, onCancel }) {
       }
 
       const endpoint = isEditing
-        ? `${RELAY_HTTP_URL}/api/murder-drivers/${driver.id}`
-        : `${RELAY_HTTP_URL}/api/murder-drivers`;
+        ? `${RELAY_HTTP_URL}/api/drivers/${driver.id}`
+        : `${RELAY_HTTP_URL}/api/drivers`;
 
       const response = await fetch(endpoint, {
         method: isEditing ? 'PATCH' : 'POST',

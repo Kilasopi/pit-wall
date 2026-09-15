@@ -28,7 +28,7 @@ function ClaimProfilePage() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetch(`${RELAY_HTTP_URL}/api/murder-drivers/unclaimed`)
+        fetch(`${RELAY_HTTP_URL}/api/drivers/unclaimed`)
             .then((res) => res.json())
             .then(setDrivers)
             .catch(() => setDrivers([]));

@@ -1,5 +1,5 @@
 -- entry_name ties a row to one entry_drivers.entry_name (e.g.
--- "MURDER-Test") so multiple concurrent entries don't share history. The
+-- "Team-Test") so multiple concurrent entries don't share history. The
 -- agent resolves it from car number, not any manual per-machine config.
 CREATE TABLE stints (
     id SERIAL PRIMARY KEY,
@@ -39,7 +39,7 @@ CREATE TABLE fuel_readings (
     source TEXT
 );
 
-CREATE TABLE murder_drivers (
+CREATE TABLE drivers (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     nickname TEXT,
@@ -48,12 +48,12 @@ CREATE TABLE murder_drivers (
     timezone TEXT
 );
 
--- Cleared out by the app when an event finishes; murder_drivers persists.
--- entry_name distinguishes which car/team when multiple MURDER entries
--- run the same event (e.g. "MURDER1", "MURDER2").
+-- Cleared out by the app when an event finishes; drivers persists.
+-- entry_name distinguishes which car/team when multiple entries
+-- run the same event (e.g. "Team1", "Team2").
 CREATE TABLE entry_drivers (
     id SERIAL PRIMARY KEY,
-    driver_id INT REFERENCES murder_drivers(id),
+    driver_id INT REFERENCES drivers(id),
     guest_name TEXT,
     event_name TEXT NOT NULL,
     entry_name TEXT NOT NULL,
