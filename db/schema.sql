@@ -48,6 +48,19 @@ CREATE TABLE drivers (
     timezone TEXT
 );
 
+CREATE TABLE teams (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- Many-to-many: most drivers belong to one team, but a driver can be on
+-- both during a transition period (e.g. moving from one team to another).
+CREATE TABLE team_memberships (
+    driver_id INT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+    team_id INT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    PRIMARY KEY (driver_id, team_id)
+);
+
 -- Cleared out by the app when an event finishes; drivers persists.
 -- entry_name distinguishes which car/team when multiple entries
 -- run the same event (e.g. "Team1", "Team2").
