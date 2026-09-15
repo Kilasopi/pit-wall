@@ -275,21 +275,6 @@ function offsetMinutes(tz) {
     return sign * (hours * 60 + mins);
 }
 
-function timeslotLabel(startAt, driverTimezone, viewerTimezone) {
-    const sameTz = driverTimezone && viewerTimezone && driverTimezone === viewerTimezone;
-    const parts = [];
-
-    if (driverTimezone) {
-        parts.push(`${formatInTimezone(startAt, driverTimezone, { dateStyle: 'full', timeStyle: 'short' })} ${getUtcOffsetLabel(driverTimezone)}`);
-    }
-    parts.push(`${formatInTimezone(startAt, 'UTC', { dateStyle: 'full', timeStyle: 'short' })} UTC`);
-    if (!sameTz && viewerTimezone) {
-        parts.push(`${formatInTimezone(startAt, viewerTimezone, { dateStyle: 'full', timeStyle: 'short' })} ${getUtcOffsetLabel(viewerTimezone)}`);
-    }
-
-    return parts.join(' | ');
-}
-
 function RacePlanner() {
     const { token } = useAuth();
     const { raceEventId } = useParams();

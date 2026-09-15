@@ -8,8 +8,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
-  CardAction,
   CardContent,
 } from '@/components/ui/card';
 import { carTypeImage } from '@/lib/carTypes';

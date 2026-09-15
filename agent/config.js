@@ -10,12 +10,6 @@ module.exports = {
 
     databaseUrl: process.env.DATABASE_URL,
 
-    // Used to fetch real track outline SVGs from the iRacing Data API for
-    // the live track map. Optional — the track map card just stays empty
-    // without them.
-    iracingEmail: process.env.IRACING_EMAIL,
-    iracingPassword: process.env.IRACING_PASSWORD,
-
     // Used for discord bot implementation:
     discordBotToken: process.env.DISCORD_BOT_TOKEN,
     discordNotifyChannelId: process.env.DISCORD_NOTIFY_CHANNEL_ID,

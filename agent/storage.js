@@ -14,17 +14,6 @@ function createStorage(databaseUrl) {
     });
 
     return {
-        async findDriverNameByIracingId(iracingId) {
-            if (!iracingId) return null;
-            const { rows } = await pool.query(
-                'SELECT name, nickname FROM murder_drivers WHERE iracing_id = $1',
-                [String(iracingId)]
-            );
-            const driver = rows[0];
-            if (!driver) return null;
-            return driver.nickname || driver.name;
-        },
-
         // Resolves which roster entry a car number belongs to, so the
         // agent can auto-detect team identity instead of needing per-Sim-PC
         // config. Multiple driver rows can share an entry_name/car_number;

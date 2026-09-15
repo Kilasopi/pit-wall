@@ -6,7 +6,7 @@
 // connection belongs to, that's resolved downstream from car number.
 const { EventEmitter } = require('events');
 const { WebSocketServer } = require('ws');
-const { createMessage, parseMessage, MESSAGE_TYPES } = require('../shared/telemetry_schema');
+const { parseMessage, MESSAGE_TYPES } = require('../shared/telemetry_schema');
 
 class AgentWebSocketServer extends EventEmitter {
     constructor({ port }) {
@@ -43,15 +43,6 @@ class AgentWebSocketServer extends EventEmitter {
             ws.on('close', () => {
                 this.emit('collector-disconnected', ws);
             });
-        });
-    }
-
-    // Sends a command back to all connected collectors.
-    sendCommand(payload) {
-        if (!this._wss) return;
-        const message = JSON.stringify(createMessage(MESSAGE_TYPES.COMMAND, payload));
-        this._wss.clients.forEach((client) => {
-            if (client.readyState === 1) client.send(message);
         });
     }
 

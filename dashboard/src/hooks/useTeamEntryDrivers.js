@@ -17,13 +17,9 @@ export function useTeamEntryDrivers(teamId, token) {
     }
 
     useEffect(() => {
-        let cancelled = false;
         load();
         const interval = setInterval(load, POLL_INTERVAL_MS);
-        return () => {
-            cancelled = true;
-            clearInterval(interval);
-        };
+        return () => clearInterval(interval);
     }, [teamId, token]);
 
     return { data, loading, refetch: load };

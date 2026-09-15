@@ -7,7 +7,6 @@ import {
     CardTitle,
     CardDescription,
     CardContent,
-    CardAction
 } from '@/components/ui/card';
 
 import {
@@ -55,7 +54,7 @@ function Spectate({ session, telemetry, stint, displayName, trackMap, fuel }) {
     const trackCountry = session?.WeekendInfo?.TrackCountry ?? '—';
 
     // Track Weather
-    const { Label: skies, Icon: SkiesIcon } = convertSkies(telemetry?.Skies);
+    const { Label: skies } = convertSkies(telemetry?.Skies);
     const airTemp = telemetry?.AirTemp?.toFixed(1) ?? '—';
     const trackTemp = telemetry?.TrackTemp?.toFixed(1) ?? '—';
     const humidity = (telemetry?.RelativeHumidity * 100)?.toFixed(0) ?? '—';
