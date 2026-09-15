@@ -130,6 +130,9 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
   const [qualiMinutesInput, setQualiMinutesInput] = useState(
     group.raceSettings?.quali_minutes != null ? String(group.raceSettings.quali_minutes) : ''
   );
+  const [carNumberInput, setCarNumberInput] = useState(
+    group.raceSettings?.car_number ?? ''
+  );
 
   function saveRaceStart(value) {
     setLocalStart(value);
@@ -171,6 +174,13 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
     if (!value) return;
     debounced('qualiMinutes', () => {
       saveRaceSettings({ qualiMinutes: minutes }).then(() => onChange?.());
+    });
+  }
+
+  function saveCarNumber(value) {
+    setCarNumberInput(value);
+    debounced('carNumber', () => {
+      saveRaceSettings({ carNumber: value }).then(() => onChange?.());
     });
   }
 
@@ -410,6 +420,17 @@ export function StintGroup({ group, onChange, saveRaceSettings }) {
               className="w-24"
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`car-number-${group.entryName}`}>Car #</Label>
+            <Input
+              id={`car-number-${group.entryName}`}
+              value={carNumberInput}
+              onChange={(e) => saveCarNumber(e.target.value)}
+              placeholder="TBD"
+              className="w-20"
+            />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`quali-driver-${group.entryName}`}>Quali Driver</Label>
             <select

@@ -39,7 +39,7 @@ function SignupPage() {
 
         try {
             await register(username, password);
-            navigate('/');
+            navigate('/claim-profile');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Could not register');
         } finally {

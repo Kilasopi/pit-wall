@@ -1075,10 +1075,12 @@ app.get('/api/teams/:teamId', requireAuth, async (req, res) => {
         `SELECT t.id, t.name, t.car_class, t.race_start_at, t.race_length_minutes,
                 t.practice_minutes, t.quali_minutes, t.locked_car_name, t.locked_timeslot_id,
                 t.quali_signup_id,
-                COALESCE(md.name, s.guest_name) AS quali_driver_name
+                COALESCE(md.name, s.guest_name) AS quali_driver_name,
+                (SELECT car_number FROM entry_drivers
+                 WHERE team_id = t.id AND car_number IS NOT NULL LIMIT 1) AS car_number
          FROM race_event_teams t
          LEFT JOIN race_event_signups s ON s.id = t.quali_signup_id
-         LEFT JOIN murder_drivers md ON md.id = s.driver_id
+         LEFT JOIN drivers md ON md.id = s.driver_id
          WHERE t.id = $1`,
         [req.params.teamId]
     );
@@ -1087,7 +1089,7 @@ app.get('/api/teams/:teamId', requireAuth, async (req, res) => {
 });
 
 app.patch('/api/teams/:teamId/race-settings', requireAuth, async (req, res) => {
-    const { raceStartAt, raceLengthMinutes, practiceMinutes, qualiMinutes, qualiSignupId } = req.body;
+    const { raceStartAt, raceLengthMinutes, practiceMinutes, qualiMinutes, qualiSignupId, carNumber } = req.body;
     const { rows } = await pool.query(
         `UPDATE race_event_teams
          SET race_start_at = COALESCE($1, race_start_at),
@@ -1099,6 +1101,17 @@ app.patch('/api/teams/:teamId/race-settings', requireAuth, async (req, res) => {
          RETURNING *`,
         [raceStartAt ?? null, raceLengthMinutes ?? null, practiceMinutes ?? null, qualiMinutes ?? null, qualiSignupId ?? null, req.params.teamId]
     );
+
+    // Car number isn't unknown until race day, so it's set here rather than
+    // at entry-driver creation — it lives on entry_drivers (matched by iRacing
+    // camera car number in agent/storage.js), not on race_event_teams itself.
+    if (carNumber !== undefined) {
+        await pool.query(
+            `UPDATE entry_drivers SET car_number = $1 WHERE team_id = $2`,
+            [carNumber || null, req.params.teamId]
+        );
+    }
+
     res.json(rows[0]);
 });
 
